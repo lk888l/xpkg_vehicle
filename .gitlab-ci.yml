@@ -1,0 +1,4 @@
+include:
+  - project: 'rosdev/public-ref'
+    ref: main
+    file: 'xpkg-ci/.gitlab-ci.yml'
