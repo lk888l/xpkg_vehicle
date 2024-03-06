@@ -1,0 +1,26 @@
+<!--xnode_vehicle_test.launch-->
+<launch>				
+    <node name="xnode_comm" pkg="xpkg_comm" type="xnode_comm" output="screen" >
+        <param name="dev_list" value="false"/>
+        <param name="com_enable" value="true"/>
+        <param name="com_channel_common" value="false"/>
+        <param name="com_channel_xstd" value="true"/>
+    </node>	
+    <node name="xnode_vehicle" pkg="xpkg_vehicle" type="xnode_vehicle" output="screen" >
+        <param name="ini_path" value="$(find xpkg_vehicle)/ini/device_id_list.ini"/>
+        <param name="show_path" value="true"/>
+        <param name="show_loc" value="false"/>
+        <param name="calc_speed" value="false"/>
+        <param name="mode_can_lock" value="false"/>
+        <param name="pub_tf" value="false"/>
+        <param name="rate_x" value="1"/>
+        <param name="rate_y" value="1"/>
+        <param name="rate_z" value="1"/>
+        <param name="rate_az" value="1"/>
+    </node>
+    <!--node name="turtle_teleop_key" pkg="turtlesim" type="turtle_teleop_key" output="screen" >
+        <remap from="/turtle1/cmd_vel" to="/cmd_vel"/>
+    </node-->
+    <node name="rviz" pkg="rviz" type="rviz" args="-d $(find xpkg_vehicle)/launch/config/rviz_vehicle.rviz" />
+
+</launch>

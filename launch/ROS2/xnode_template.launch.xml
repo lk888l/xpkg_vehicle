@@ -1,5 +1,0 @@
-<launch> 
-    <node name="xnode_template" pkg="xpkg_template" exec="xnode_template" output="screen" >
-        <param name="out_str" value="hello"/>
-    </node>
-</launch>

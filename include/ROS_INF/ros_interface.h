@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #if X_ROS_VERSION==1
 #include "internal_ros1_interface.h"

@@ -1,0 +1,23 @@
+<!--xnode_vehicle_test.launch-->
+<launch>		
+    <node name="rviz2" pkg="rviz2" exec="rviz2" args="-d $(find-pkg-share xpkg_vehicle)/launch/config/rviz_vehicle.rviz" />
+    <node name="xnode_comm" pkg="xpkg_comm" exec="xnode_comm" output="screen" >
+        <param name="dev_list" value="false"/>
+        <param name="com_enable" value="true"/>
+        <param name="com_channel_common" value="false"/>
+        <param name="com_channel_xstd" value="true"/>
+    </node>	
+    <node name="xnode_vehicle" pkg="xpkg_vehicle" exec="xnode_vehicle" output="screen" >
+        <param name="ini_path" value="$(find-pkg-share xpkg_vehicle)/ini/device_id_list.ini"/>
+        <param name="show_path" value="true"/>
+        <param name="show_loc" value="false"/>
+        <param name="calc_speed" value="false"/>
+        <param name="mode_can_lock" value="true"/>
+	<param name="pub_tf" value="true"/>
+        <param name="rate_x" value="0.3"/>
+        <param name="rate_y" value="0.3"/>
+        <param name="rate_z" value="0.3"/>
+        <param name="rate_az" value="0.3"/>
+    </node>
+   
+</launch>

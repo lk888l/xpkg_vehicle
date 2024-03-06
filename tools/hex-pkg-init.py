@@ -1,9 +1,5 @@
 # -*- coding: utf-8 -*-
-
-
-# !!! 记得修改包的名字 !!!
-pkg_name = "xpkg_template" # TODO本包名称, 请记得修改
-#!!!!!!!!
+pkg_name = "xpkg_vehicle" # 本包名称  
 
 import sys  # 检查是不是 python3
 if sys.version_info.major < 3:
