@@ -73,4 +73,3 @@ json in list(/xtopic_vehicle/ctrl_json)
         3) (bool) spec_func_state :          0=off 1=on, cheak datasheet for special function details
         4) (unsigned char) work_mode :       0=standby 1=remote 2=CAN 3=free
         5) (bool) err_clear :                0=off 1=on,clear all error status
-
