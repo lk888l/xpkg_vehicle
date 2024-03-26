@@ -57,10 +57,11 @@ int main(int argc, char **argv)
 {
     ROSInterface& ros_interface = ROSInterface::GetInterface();
     ros_interface.BaseInit(argc, argv, "xnode_vehicle", 20.0, TimeCallback);
-    if(ros_interface.NodeCheck("xnode_comm") == false)
+    while(ros_interface.NodeCheck("xnode_comm") == false)
     {
+        usleep(1000000);
         ros_interface.ROSLog(LogLevel::kError," Please bringup node<xnode_comm> first!!!!!!!!!!!!!!!!!!!");
-        ros_interface.Shutdown();
+            //ros_interface.Shutdown();
     }
 
     LibFileIni& lib_file_ini = LibFileIni::GetLibFileIni();
