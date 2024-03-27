@@ -211,11 +211,12 @@ void VehicleFuncOdom::CalcWithOdom(double v_r,double odom_l,double odom_r,double
         double d_avg = (d_odom_r + d_odom_l) / 2.0;
         double d_th = (d_odom_r - d_odom_l)*m_track_width / math_buff;
 
-
+        if(d_avg>0.5 || d_avg<-0.5)d_avg = d_avg_last;
         d_avg = (d_avg_last + d_avg)/2;
         if(d_avg < 0.0005 && d_avg > -0.0005)d_avg = 0;
         d_avg_last = d_avg;
 
+        if(d_th>0.5 || d_th<-0.5)d_th = d_th_last;
         d_th = (d_th_last + d_th)/2;
         if(d_th < 0.001 && d_th > -0.001)d_th = 0;
         d_th_last = d_th;
@@ -224,8 +225,8 @@ void VehicleFuncOdom::CalcWithOdom(double v_r,double odom_l,double odom_r,double
         m_data_odom.odom_r = odom_r;
         m_data_odom.vx = d_avg / dt;
         m_data_odom.vy = 0;
-        m_data_odom.vthz = d_th / dt;
-        
+        m_data_odom.vthz = d_th / dt;        
+
         double delta_x = cos(d_th) * d_avg;
         double delta_y = -sin(d_th) * d_avg;
 
@@ -249,10 +250,12 @@ void VehicleFuncOdom::CalcWithOdom(double v_r,double odom_l,double odom_r,double
         m_data_odom.odom_l = odom_l;
         m_data_odom.odom_r = odom_r;
 
+        if(d_avg>0.5 || d_avg<-0.5)d_avg = d_avg_last;
         d_avg = (d_avg_last + d_avg)/2;
         if(d_avg < 0.0005 && d_avg > -0.0005)d_avg = 0;
         d_avg_last = d_avg;
 
+        if(d_th>0.5 || d_th<-0.5)d_th = d_th_last;
         d_th = (d_th_last + d_th)/2;
         if(d_th < 0.001 && d_th > -0.001)d_th = 0;
         d_th_last = d_th;
@@ -297,14 +300,17 @@ void VehicleFuncOdom::CalcWithOdom(double v_r,double odom_l,double odom_r,double
       double d_avg_y = (d_odom_r + d_odom_l_s - d_odom_l - d_odom_r_s) / 4;
       double d_th = (d_odom_r_s + d_odom_r - d_odom_l - d_odom_l_s) / 2 / (m_track_width + m_wheel_base);  
 
+      if(d_avg_x>0.5 || d_avg_x<-0.5)d_avg_x = d_avg_last;
       d_avg_x = (d_avg_last + d_avg_x)/2;
       if(d_avg_x < 0.0005 && d_avg_x > -0.0005)d_avg_x = 0;
       d_avg_last = d_avg_x;
 
+      if(d_avg_y>0.5 || d_avg_y<-0.5)d_avg_y = d_avg_y_last;
       d_avg_y = (d_avg_y_last + d_avg_y)/2;
       if(d_avg_y < 0.0005 && d_avg_y > -0.0005)d_avg_y = 0;
       d_avg_y_last = d_avg_y;
 
+      if(d_th>0.5 || d_th<-0.5)d_th = d_th_last;
       d_th = (d_th_last + d_th)/2;
       if(d_th < 0.001 && d_th > -0.001)d_th = 0;
       d_th_last = d_th;
