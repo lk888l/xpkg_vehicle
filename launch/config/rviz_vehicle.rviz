@@ -8,7 +8,6 @@ Panels:
         - /Status1
         - /Path1
         - /Odometry1/Shape1
-        - /Axes1
       Splitter Ratio: 0.5
     Tree Height: 549
   - Class: rviz/Selection
@@ -112,13 +111,6 @@ Visualization Manager:
       Topic: /odom
       Unreliable: false
       Value: false
-    - Class: rviz/Axes
-      Enabled: true
-      Length: 1
-      Name: Axes
-      Radius: 0.10000000149011612
-      Reference Frame: base_link
-      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -147,16 +139,16 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 10.15310287475586
+      Distance: 10.125638961791992
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -0.08542069792747498
-        Y: 2.1317501068115234
-        Z: 1.206318736076355
+        X: 0.12090819329023361
+        Y: 0.29130154848098755
+        Z: -0.26866525411605835
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
@@ -183,5 +175,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1267
-  X: 205
-  Y: 71
+  X: 629
+  Y: 56

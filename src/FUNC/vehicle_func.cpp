@@ -165,7 +165,7 @@ void VehicleFunc::EnableCheck()
 #define MODE_WRONG 3
 void VehicleFunc::ModeCheck()
 {
-    static unsigned char mode_state = MODE_INIT,mode_old = 0xff,mode_buff = 0xff;
+    static unsigned char mode_state = MODE_INIT,mode_buff = 0xff;
     ROSInterface& ros_interface = ROSInterface::GetInterface();
     if(ros_interface.m_mode_can_lock == false)
     {
@@ -175,19 +175,14 @@ void VehicleFunc::ModeCheck()
     if(!m_dev_info.s_en_state)
     {
         mode_state = MODE_INIT;
-        mode_old = 99;
         return;
     }
 
     switch(mode_state)
     {
     case MODE_INIT:
-        if(ros_interface.m_mode_can_lock == false)
-        {
-            f_mode = true;
-            ros_interface.ROSLog(LogLevel::kInfo,"\033[1;32m %s: mode unlock \033[0m",DEV_NODE_NAME);
-            mode_state = MODE_OK;
-        }else mode_state = MODE_INIT_FINISH;
+        if(ros_interface.m_mode_can_lock == false)ros_interface.ROSLog(LogLevel::kInfo,"\033[1;32m %s: mode unlock \033[0m",DEV_NODE_NAME);
+        else ros_interface.ROSLog(LogLevel::kInfo,"\033[1;32m %s: CAN mode locked \033[0m",DEV_NODE_NAME);
 
         DevMode(MODE_CAN,BEEP_OFF,0,0);
         DevCtrlInfo(0);
@@ -195,9 +190,21 @@ void VehicleFunc::ModeCheck()
         DevSensorInfo(0);
         DevDrvMotion(1);
         usleep(200000);
+        DevMode(MODE_CAN,BEEP_OFF,0,0);
+        DevCtrlInfo(0);
+        DevDrvState(0);
+        DevSensorInfo(0);
+        DevDrvMotion(1);
+        usleep(200000);
+        mode_state = MODE_INIT_FINISH;
         break;
     case MODE_INIT_FINISH:
-        if(ros_interface.m_mode_can_lock == false)break;
+        if(ros_interface.m_mode_can_lock == false)
+        {
+            f_mode = true;
+            mode_state = MODE_OK;
+            break;
+        }
         if(m_dev_info.s_work_mode == MODE_CAN)
         {
             mode_state = MODE_OK;
@@ -220,19 +227,18 @@ void VehicleFunc::ModeCheck()
         {
              ros_interface.ROSLog(LogLevel::kInfo,"\033[1;32m %s: mode OK(CAN mode) \033[0m",DEV_NODE_NAME);
              mode_state = MODE_OK;
-             f_mode = true;
-             mode_old = m_dev_info.s_work_mode;
+             f_mode = true;             
              break;
         }
-        if(mode_old != m_dev_info.s_work_mode)ros_interface.ROSLog(LogLevel::kWarn," %s: Wrong mode--%X (need be 2),"
-                                                                                   "please close remote control or switch SWA to bottom ",DEV_NODE_NAME,m_dev_info.s_work_mode);
-        mode_old = m_dev_info.s_work_mode;
+        ros_interface.ROSLog(LogLevel::kWarn," %s: Wrong mode--%X (need be 2),"
+                                               "please close remote control or switch SWA to bottom ",DEV_NODE_NAME,m_dev_info.s_work_mode);
+        ros_interface.ROSLog(LogLevel::kWarn," %s: Retry to change to CAN mode",DEV_NODE_NAME);
         DevMode(MODE_CAN,BEEP_OFF,0,0);
         DevCtrlInfo(0);
         DevDrvState(0);
         DevSensorInfo(0);
         DevDrvMotion(0);
-        usleep(200000);
+        usleep(2000000);
         break;
     }
 }
