@@ -35,6 +35,7 @@ void ROSInterface::BaseDeinit()
 
     // sub
     sub_vel.reset();
+    sub_vel_stamp.reset();
     sub_com_xstd.reset();
 
     // node
@@ -174,7 +175,7 @@ void ROSInterface::SubscriptionInit()
 { 
     sub_com_xstd = m_node_ptr->create_subscription<xpkg_msgs::msg::XmsgCommData>("/xtopic_comm/com_recv_xstd_vehicle", 1000, std::bind(&ROSInterface::ComXstdCallback, this, std::placeholders::_1));
     sub_vel = m_node_ptr->create_subscription<geometry_msgs::msg::Twist>("/cmd_vel", 50, std::bind(&ROSInterface::VelCallback, this, std::placeholders::_1));
-    sub_vel = m_node_ptr->create_subscription<geometry_msgs::msg::TwistStamped>("/cmd_vel_stamp", 50, std::bind(&ROSInterface::VelCallback2, this, std::placeholders::_1));
+    sub_vel_stamp = m_node_ptr->create_subscription<geometry_msgs::msg::TwistStamped>("/cmd_vel_stamp", 50, std::bind(&ROSInterface::VelCallback2, this, std::placeholders::_1));
     sub_json_ctrl = m_node_ptr->create_subscription<std_msgs::msg::String>("/xtopic_vehicle/ctrl_json", 50, std::bind(&ROSInterface::JsonCtrlCallback, this, std::placeholders::_1));
 }
 /*------------------------------------------------------------------------------------------------------------------
