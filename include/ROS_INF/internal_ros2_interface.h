@@ -143,6 +143,7 @@ class ROSInterface
 
     //add sub Variable below/////////////////////////////////
     rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr sub_vel;
+    rclcpp::Subscription<geometry_msgs::msg::TwistStamped>::SharedPtr sub_vel_stamp;
     rclcpp::Subscription<xpkg_msgs::msg::XmsgCommData>::SharedPtr sub_com_xstd;
     rclcpp::Subscription<std_msgs::msg::String>::SharedPtr sub_json_ctrl;
 
