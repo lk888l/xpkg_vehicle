@@ -174,6 +174,7 @@ void ROSInterface::SubscriptionInit()
 { 
     sub_com_xstd = m_node_ptr->create_subscription<xpkg_msgs::msg::XmsgCommData>("/xtopic_comm/com_recv_xstd_vehicle", 1000, std::bind(&ROSInterface::ComXstdCallback, this, std::placeholders::_1));
     sub_vel = m_node_ptr->create_subscription<geometry_msgs::msg::Twist>("/cmd_vel", 50, std::bind(&ROSInterface::VelCallback, this, std::placeholders::_1));
+    sub_vel = m_node_ptr->create_subscription<geometry_msgs::msg::TwistStamped>("/cmd_vel_stamp", 50, std::bind(&ROSInterface::VelCallback2, this, std::placeholders::_1));
     sub_json_ctrl = m_node_ptr->create_subscription<std_msgs::msg::String>("/xtopic_vehicle/ctrl_json", 50, std::bind(&ROSInterface::JsonCtrlCallback, this, std::placeholders::_1));
 }
 /*------------------------------------------------------------------------------------------------------------------
@@ -289,6 +290,20 @@ void ROSInterface::VelCallback(const geometry_msgs::msg::Twist::SharedPtr cmd_ve
     data_vel.ang_z = cmd_vel->angular.z;
     m_list_vel.push_back(data_vel);
     if (m_list_vel.size() > 500) m_list_vel.clear();
+}
+///////////////////////////////////////////////////////////////////////////////////////////////
+void ROSInterface::VelCallback2(const geometry_msgs::msg::TwistStamped::SharedPtr cmd_vel)
+{
+    m_f_vel = true;
+    VelData data_vel;
+    data_vel.line_x = cmd_vel->twist.linear.x;
+    data_vel.line_y = cmd_vel->twist.linear.y;
+    data_vel.line_z = cmd_vel->twist.linear.z;
+    data_vel.ang_x = cmd_vel->twist.angular.x;
+    data_vel.ang_y = cmd_vel->twist.angular.y;
+    data_vel.ang_z = cmd_vel->twist.angular.z;
+    m_list_vel.push_back(data_vel);
+    if(m_list_vel.size()>500)m_list_vel.clear();
 }
 ///////////////////////////////////////////////////////////////////////////////////////////////
 void ROSInterface::JsonCtrlCallback(const std_msgs::msg::String::SharedPtr data)

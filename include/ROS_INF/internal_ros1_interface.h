@@ -111,6 +111,7 @@ class ROSInterface
     //add sub callback below////////////////////////////////////
     void ComXstdCallback(const xpkg_msgs::XmsgCommDataPtr& data);
     void VelCallback(const geometry_msgs::TwistPtr& cmd_vel);
+    void VelCallback2(const geometry_msgs::TwistStampedPtr& cmd_vel);
     void JsonCtrlCallback(const std_msgs::StringPtr& data);
 
   public:

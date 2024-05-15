@@ -18,6 +18,7 @@ Note
         4) Don't Change parameter of "ini_path"
         5) This node will publish message "/xtopic_XXX/device_state_json" and "/xtopic_comm/com_send_xstd"
         6) Must run with xpkg_comm
+        7) If need to use geometry_msgs/TwistStamped for vel control,please use topic:cmd_vel_stamp
 
 Special note: please use include/LIB_JSON/ArduinoJson.h,view < https://arduinojson.org > for details
 

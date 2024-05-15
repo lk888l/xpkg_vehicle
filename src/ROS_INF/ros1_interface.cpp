@@ -143,6 +143,7 @@ void ROSInterface::SubscriptionInit()
 { 
     sub_com_xstd = m_node_local_ptr->subscribe("/xtopic_comm/com_recv_xstd_vehicle", 1000, &ROSInterface::ComXstdCallback, this);
     sub_vel = m_node_local_ptr->subscribe("/cmd_vel", 50, &ROSInterface::VelCallback, this);
+    sub_vel = m_node_local_ptr->subscribe("/cmd_vel_stamp", 50, &ROSInterface::VelCallback2, this);
     sub_json_ctrl = m_node_local_ptr->subscribe("/xtopic_vehicle/ctrl_json", 50, &ROSInterface::JsonCtrlCallback, this);
 }
 /*------------------------------------------------------------------------------------------------------------------
@@ -248,6 +249,20 @@ void ROSInterface::VelCallback(const geometry_msgs::TwistPtr& cmd_vel)
     data_vel.ang_x = cmd_vel->angular.x;
     data_vel.ang_y = cmd_vel->angular.y;
     data_vel.ang_z = cmd_vel->angular.z;
+    m_list_vel.push_back(data_vel);
+    if(m_list_vel.size()>500)m_list_vel.clear();
+}
+///////////////////////////////////////////////////////////////////////////////////////////////
+void ROSInterface::VelCallback2(const geometry_msgs::TwistStampedPtr& cmd_vel)
+{
+    m_f_vel = true;
+    VelData data_vel;
+    data_vel.line_x = cmd_vel->twist.linear.x;
+    data_vel.line_y = cmd_vel->twist.linear.y;
+    data_vel.line_z = cmd_vel->twist.linear.z;
+    data_vel.ang_x = cmd_vel->twist.angular.x;
+    data_vel.ang_y = cmd_vel->twist.angular.y;
+    data_vel.ang_z = cmd_vel->twist.angular.z;
     m_list_vel.push_back(data_vel);
     if(m_list_vel.size()>500)m_list_vel.clear();
 }
