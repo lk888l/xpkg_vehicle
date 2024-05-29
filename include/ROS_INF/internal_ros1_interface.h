@@ -142,6 +142,7 @@ class ROSInterface
 
     //add sub Variable below/////////////////////////////////
     ros::Subscriber sub_vel;
+    ros::Subscriber sub_vel_stamp;
     ros::Subscriber sub_com_xstd;
     ros::Subscriber sub_json_ctrl;
 

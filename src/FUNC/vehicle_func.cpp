@@ -231,7 +231,8 @@ void VehicleFunc::ModeCheck()
              break;
         }
         ros_interface.ROSLog(LogLevel::kWarn," %s: Wrong mode--%X (need be 2),"
-                                               "please close remote control or switch SWA to bottom ",DEV_NODE_NAME,m_dev_info.s_work_mode);
+                                               "please close remote or switch SWA to bottom."
+                                             "If want to use remote,please change <mode_can_lock> in launch file to <false> ",DEV_NODE_NAME,m_dev_info.s_work_mode);
         ros_interface.ROSLog(LogLevel::kWarn," %s: Retry to change to CAN mode",DEV_NODE_NAME);
         DevMode(MODE_CAN,BEEP_OFF,0,0);
         DevCtrlInfo(0);

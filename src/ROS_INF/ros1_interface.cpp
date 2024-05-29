@@ -143,7 +143,7 @@ void ROSInterface::SubscriptionInit()
 { 
     sub_com_xstd = m_node_local_ptr->subscribe("/xtopic_comm/com_recv_xstd_vehicle", 1000, &ROSInterface::ComXstdCallback, this);
     sub_vel = m_node_local_ptr->subscribe("/cmd_vel", 50, &ROSInterface::VelCallback, this);
-    sub_vel = m_node_local_ptr->subscribe("/cmd_vel_stamp", 50, &ROSInterface::VelCallback2, this);
+    sub_vel_stamp = m_node_local_ptr->subscribe("/cmd_vel_stamp", 50, &ROSInterface::VelCallback2, this);
     sub_json_ctrl = m_node_local_ptr->subscribe("/xtopic_vehicle/ctrl_json", 50, &ROSInterface::JsonCtrlCallback, this);
 }
 /*------------------------------------------------------------------------------------------------------------------
