@@ -290,7 +290,12 @@ void ROSInterface::VelCallback(const geometry_msgs::msg::Twist::SharedPtr cmd_ve
     data_vel.ang_y = cmd_vel->angular.y;
     data_vel.ang_z = cmd_vel->angular.z;
     m_list_vel.push_back(data_vel);
-    if (m_list_vel.size() > 500) m_list_vel.clear();
+    if(m_list_vel.size()>500)
+    {
+        m_list_vel.clear();
+        ROSLog(LogLevel::kWarn,"%ROS2_interface: cmd_vel msg is full,please reduce the publishing frequency");
+    }
+
 }
 ///////////////////////////////////////////////////////////////////////////////////////////////
 void ROSInterface::VelCallback2(const geometry_msgs::msg::TwistStamped::SharedPtr cmd_vel)
@@ -304,13 +309,22 @@ void ROSInterface::VelCallback2(const geometry_msgs::msg::TwistStamped::SharedPt
     data_vel.ang_y = cmd_vel->twist.angular.y;
     data_vel.ang_z = cmd_vel->twist.angular.z;
     m_list_vel.push_back(data_vel);
-    if(m_list_vel.size()>500)m_list_vel.clear();
+    if(m_list_vel.size()>500)
+    {
+        m_list_vel.clear();
+        ROSLog(LogLevel::kWarn,"%ROS2_interface: cmd_vel msg is full,please reduce the publishing frequency");
+    }
 }
 ///////////////////////////////////////////////////////////////////////////////////////////////
 void ROSInterface::JsonCtrlCallback(const std_msgs::msg::String::SharedPtr data)
 {
     m_f_json_ctrl = true;
     m_json_ctrl.append(data->data);
+    if(m_json_ctrl.size()>50000)
+    {
+        m_json_ctrl.clear();
+        ROSLog(LogLevel::kWarn,"%ROS2_interface: json ctrl msg is full,please reduce the publishing frequency");
+    }
 }
 
 }//namespace XROS_VEHICLE

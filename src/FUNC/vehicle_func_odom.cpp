@@ -87,7 +87,7 @@ void VehicleFuncOdom::CalcWithSpeed(double v_x,double v_y,double v_r,double time
     if(dt == 0.0)return;
     serial_num_last = serial_num;
     time_last = time_now;
-    if(m_model.compare("Differential")==0 || m_model.compare("Mecanum")==0)
+    if(m_model.compare("Differential")==0 || m_model.compare("Mecanum")==0 || m_model.compare("Delta_omni")==0 || m_model.compare("Quad_omni")==0)
     {
         double delta_th = v_r * dt;
         double delta_x = (v_x * cos(delta_th) - v_y * sin(delta_th)) * dt;
@@ -299,6 +299,56 @@ void VehicleFuncOdom::CalcWithOdom(double v_r,double odom_l,double odom_r,double
       double d_avg_x = (d_odom_r_s + d_odom_r + d_odom_l_s + d_odom_l) / 4;
       double d_avg_y = (d_odom_r + d_odom_l_s - d_odom_l - d_odom_r_s) / 4;
       double d_th = (d_odom_r_s + d_odom_r - d_odom_l - d_odom_l_s) / 2 / (m_track_width + m_wheel_base);  
+
+      if(d_avg_x>0.5 || d_avg_x<-0.5)d_avg_x = d_avg_last;
+      d_avg_x = (d_avg_last + d_avg_x)/2;
+      if(d_avg_x < 0.0005 && d_avg_x > -0.0005)d_avg_x = 0;
+      d_avg_last = d_avg_x;
+
+      if(d_avg_y>0.5 || d_avg_y<-0.5)d_avg_y = d_avg_y_last;
+      d_avg_y = (d_avg_y_last + d_avg_y)/2;
+      if(d_avg_y < 0.0005 && d_avg_y > -0.0005)d_avg_y = 0;
+      d_avg_y_last = d_avg_y;
+
+      if(d_th>0.5 || d_th<-0.5)d_th = d_th_last;
+      d_th = (d_th_last + d_th)/2;
+      if(d_th < 0.001 && d_th > -0.001)d_th = 0;
+      d_th_last = d_th;
+
+      m_data_odom.vx = d_avg_x / dt;
+      m_data_odom.vy = d_avg_y / dt;
+      m_data_odom.vthz = d_th / dt;
+
+      double delta_x = d_avg_x * cos(d_th) - d_avg_y * sin(d_th);
+      double delta_y = d_avg_x * sin(d_th) + d_avg_y * cos(d_th);
+
+      m_data_odom.x += cos(m_data_odom.th) * delta_x - sin(m_data_odom.th) * delta_y;
+      m_data_odom.y += sin(m_data_odom.th) * delta_x + cos(m_data_odom.th) * delta_y;
+      m_data_odom.th += d_th;
+
+    }
+    /////////////////////////////////////////////////////////////////////////////////////////////////////////
+    if(m_model.compare("Delta_omni")==0)
+    {
+      if(m_wheel_base == 999.0)
+      {
+          ros_interface.ROSLog(LogLevel::kError," xnode_vehicle: Unknown WHEEL BASE for odom calculation");
+          ros_interface.Shutdown();
+          return;
+      }
+
+      double d_odom_l =odom_l-m_data_odom.odom_l;
+      double d_odom_r =odom_r-m_data_odom.odom_r;
+      double d_odom_l_s =odom_l_s-m_data_odom.odom_l_s;
+      double d_odom_r_s =odom_r_s-m_data_odom.odom_r_s;
+      m_data_odom.odom_l = odom_l;
+      m_data_odom.odom_r = odom_r;
+      m_data_odom.odom_l_s = odom_l_s;
+      m_data_odom.odom_r_s = odom_r_s;
+
+      double d_avg_x = (d_odom_r_s + d_odom_r + d_odom_l_s + d_odom_l) / 4;
+      double d_avg_y = (d_odom_r + d_odom_l_s - d_odom_l - d_odom_r_s) / 4;
+      double d_th = (d_odom_r_s + d_odom_r - d_odom_l - d_odom_l_s) / 2 / (m_track_width + m_wheel_base);
 
       if(d_avg_x>0.5 || d_avg_x<-0.5)d_avg_x = d_avg_last;
       d_avg_x = (d_avg_last + d_avg_x)/2;
