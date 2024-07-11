@@ -13,11 +13,11 @@
         <param name="show_loc" value="false"/>
         <param name="calc_speed" value="false"/>
         <param name="mode_can_lock" value="true"/>
-	<param name="pub_tf" value="true"/>
-        <param name="rate_x" value="0.3"/>
-        <param name="rate_y" value="0.3"/>
-        <param name="rate_z" value="0.3"/>
-        <param name="rate_az" value="0.3"/>
+    <param name="pub_tf" value="false"/>
+        <param name="rate_x" value="1.0"/>
+        <param name="rate_y" value="1.0"/>
+        <param name="rate_z" value="1.0"/>
+        <param name="rate_az" value="1.0"/>
     </node>
    
 </launch>

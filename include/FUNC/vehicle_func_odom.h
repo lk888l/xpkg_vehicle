@@ -7,6 +7,9 @@
 
 #define MODE_ANGLE_VEL 0
 #define MODE_ANGLE 1
+#define REAL_TIME false
+#define DATA_PERIOD 0.02
+
 /////////////////////////////////////////////////
 struct  DataOdom{
   double odom_r = 0.0;

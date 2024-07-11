@@ -50,11 +50,11 @@ def generate_launch_description():
             "show_loc": False,
             "calc_speed": False,
             "mode_can_lock": True,
-	    "pub_tf": True,
-            "rate_x": 0.3,
-            "rate_y": 0.3,
-            "rate_z": 0.3,
-            "rate_az": 0.3,
+        "pub_tf": False,
+            "rate_x": 1.0,
+            "rate_y": 1.0,
+            "rate_z": 1.0,
+            "rate_az": 1.0,
         }]
     )
     
