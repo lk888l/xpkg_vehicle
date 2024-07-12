@@ -238,7 +238,6 @@ void VehicleFuncOdom::CalcWithOdom(double v_r,double odom_l,double odom_r,double
         d_avg_x = (d_odom_l+d_odom_r) * sqrt(3) / 3.0;
         d_avg_y = d_odom_l_s * 2 / 3 + (d_odom_r - d_odom_l) / 3 ;
         d_th = (d_odom_r - d_odom_l - d_odom_l_s) / m_track_width / sqrt(3);
-        //ros_interface.ROSLog(LogLevel::kInfo," %f %f %f",d_avg_x,d_avg_y,m_wheel_base);
     }
     ////////////////////////////////////////////////////////////////////////////////
     if(d_avg_x>0.5 || d_avg_x<-0.5)d_avg_x = d_avg_last;
