@@ -33,12 +33,13 @@ enum class LogLevel
 };
 struct XstdData
 {
-  unsigned char id_c;
-  unsigned char id_t;
-  unsigned char id_n;
-  unsigned char id_f;
-  unsigned char len;
-  unsigned char data[8];
+  uint8_t id_c;
+  uint8_t id_t;
+  uint8_t id_n;
+  uint8_t id_f;
+  uint8_t len;
+  uint8_t data[8];
+  uint32_t time_ms = 0;
   double time;
 };
 struct VelData

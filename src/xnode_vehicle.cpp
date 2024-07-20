@@ -42,8 +42,8 @@ void TimeCallback() {
             info = vehicle_func.GetVehicleInfo();
             vehicle_func.ComDataOut();
             vehicle_func.DevInfoOut();
-            if(ros_interface.m_calc_speed)func_odom.CalcWithSpeed(info.s_speed_x,info.s_speed_y,info.s_speed_r,info.s_time,info.s_serial,info.s_rotate_mode);
-            else func_odom.CalcWithOdom(info.s_speed_r,info.s_odo_left,info.s_odo_right,info.s_odo_left_s,info.s_odo_right_s,info.s_time,info.s_serial,info.s_rotate_mode);
+            if(ros_interface.m_calc_speed)func_odom.CalcWithSpeed(info.s_speed_x,info.s_speed_y,info.s_speed_r,static_cast<double>(info.s_time_ms)/1000.0,info.s_serial,info.s_rotate_mode);
+            else func_odom.CalcWithOdom(info.s_speed_r,info.s_odo_left,info.s_odo_right,info.s_odo_left_s,info.s_odo_right_s,static_cast<double>(info.s_time_ms)/1000.0,info.s_serial,info.s_rotate_mode);
             func_odom.ShowLoc();
             func_odom.PubDevOdom();
             if(!vehicle_func.IsOnline())sys_state = SYS_BASE_INIT;

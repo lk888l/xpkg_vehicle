@@ -359,6 +359,7 @@ void VehicleFunc::ComDataIn()
                 memcpy(&temp,&data_recv.data[4],2);
                 m_dev_info.s_speed_r = static_cast<double>(temp)/1000;
                 m_dev_info.s_time = data_recv.time;
+                m_dev_info.s_time_ms = data_recv.time_ms;
                 m_dev_info.s_serial++;
                 if(m_dev_info.s_serial == 10000)m_dev_info.s_serial = 0;
 

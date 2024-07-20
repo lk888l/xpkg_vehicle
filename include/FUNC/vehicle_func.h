@@ -21,6 +21,8 @@ using namespace XROS_VEHICLE;
 
 struct VehicleInfo
 {
+    double s_time = 0.0;
+    uint32_t s_time_ms = 0;
     //vehicle info
     unsigned char s_type = 0;
     unsigned char s_num = 0;
@@ -80,7 +82,6 @@ struct VehicleInfo
     bool s_driver_err_heat_over[4] = {1,1,1,1};
     bool s_motor_err_current_over[4] = {1,1,1,1};
     bool s_motor_err_heat_over[4] = {1,1,1,1};
-    double s_time = 0.0;
     int s_serial = 0;
 };
 //////////////////////////////////////////////////////////////////
