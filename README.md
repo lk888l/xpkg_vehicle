@@ -1,14 +1,15 @@
-## ROS driver for vehicle
+##ROS driver manual
 
 How to use xpkg_XXX(XXX is your device) ros driver
 =====================================================================
         1) Clone this ros package folder(xpkg_XXX) to your catkin's workspace src folder
         2) Run catkin_make to build
-        3) Add path of setup.bash to ~/.bashrc like: echo "source ~/workspace/devel/setup.bash">> ~/.bashrc	source ~/.bashrc
-        4) Change parameters in xnode_XXX_test.launch(xpkg_XXX/launch/xnode_XXX_test.launch)
-        6) prepare xpkg_comm and Roslaunch xnode_comm.launch(xpkg_comm/launch/xnode_comm.launch)
+        3) Add path of setup.bash to ~/.bashrc like: echo "source ~/workspace/devel/setup.bash">> ~/.bashrc
+        4) source ~/.bashrc
+        5) Change parameters in xnode_XXX_test.launch(xpkg_XXX/launch/xnode_XXX_test.launch)
         7) Roslaunch xnode_XXX_test.launch(xpkg_XXX/launch/xnode_XXX_test.launch)
-        8) Use topic /xpkg_XXX/ctrl_json to control sensor function
+        8) Use topic /xtopic_XXX/ctrl_json to control
+        9) Use topic /xtopic_XXX/device_state_json to receive device info
 
 Note
 =====================================================================
@@ -18,9 +19,10 @@ Note
         4) Don't Change parameter of "ini_path"
         5) This node will publish message "/xtopic_XXX/device_state_json" and "/xtopic_comm/com_send_xstd"
         6) Must run with xpkg_comm
-        7) If need to use geometry_msgs/TwistStamped for vel control,please use topic:cmd_vel_stamp
 
 Special note: please use include/LIB_JSON/ArduinoJson.h,view < https://arduinojson.org > for details
+
+please view < docs.hexmove.cn > to get more function details
 
 Mode
 =====================================================================
