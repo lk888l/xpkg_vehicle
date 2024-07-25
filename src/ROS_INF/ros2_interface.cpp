@@ -274,6 +274,7 @@ void ROSInterface::ComXstdCallback(const xpkg_msgs::msg::XmsgCommData::SharedPtr
     data_com.id_n = data->id_n;
     data_com.id_f = data->id_f;
     memcpy(&data_com.data[0], &data->data[0], data->len);
+    data_com.time_ms = data->hardware_time_stamp_ms;
     data_com.time = m_node_ptr->now().seconds();
     m_list_com_xstd.push_back(data_com);
     if (m_list_com_xstd.size() > 500) m_list_com_xstd.clear();

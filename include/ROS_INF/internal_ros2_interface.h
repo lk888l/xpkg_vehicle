@@ -40,6 +40,7 @@ struct XstdData
   unsigned char id_f;
   unsigned char len;
   unsigned char data[8];
+  uint32_t time_ms = 0;
   double time;
 };
 struct VelData
