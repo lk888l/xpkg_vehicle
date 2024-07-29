@@ -10,7 +10,7 @@
         <param name="ini_path" value="$(find xpkg_vehicle)/ini/device_id_list.ini"/>
         <param name="show_path" value="true"/>
         <param name="show_loc" value="false"/>
-        <param name="calc_speed" value="false"/>
+        <param name="calc_speed" value="true"/>
         <param name="mode_can_lock" value="true"/>
         <param name="pub_tf" value="false"/>
         <param name="rate_x" value="1"/>

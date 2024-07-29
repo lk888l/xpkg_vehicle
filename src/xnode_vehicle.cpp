@@ -20,7 +20,7 @@ void TimeCallback() {
     VehicleInfo info;
     static char sys_state = SYS_BASE_INIT;
 
-    vehicle_func.ComDataIn();
+    vehicle_func.SubComData();
     vehicle_func.OnlineCheck();
     vehicle_func.EnableCheck();
     vehicle_func.ModeCheck();
@@ -37,11 +37,11 @@ void TimeCallback() {
             sys_state = SYS_READY;
             break;
         case SYS_READY:
-            vehicle_func.VelDataIn();
-            vehicle_func.CtrlDataIn();
+            vehicle_func.SubVelData();
+            vehicle_func.SubCtrlData();
             info = vehicle_func.GetVehicleInfo();
-            vehicle_func.ComDataOut();
-            vehicle_func.DevInfoOut();
+            vehicle_func.PubComData();
+            vehicle_func.PubDevInfo();
             if(ros_interface.m_calc_speed)func_odom.CalcWithSpeed(info.s_speed_x,info.s_speed_y,info.s_speed_r,static_cast<double>(info.s_time_ms)/1000.0,info.s_serial,info.s_rotate_mode);
             else func_odom.CalcWithOdom(info.s_speed_r,info.s_odo_left,info.s_odo_right,info.s_odo_left_s,info.s_odo_right_s,static_cast<double>(info.s_time_ms)/1000.0,info.s_serial,info.s_rotate_mode);
             func_odom.ShowLoc();

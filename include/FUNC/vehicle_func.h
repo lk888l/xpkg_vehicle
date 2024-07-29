@@ -96,14 +96,15 @@ public:
     inline int IsModeOn(void){ return f_mode; }
     inline int IsReady(void){ return f_ready; }
     void BaseInit(void);
-    void ComDataOut();
-    void DevInfoOut();
-    void VelDataIn();
-    void ComDataIn();
-    void CtrlDataIn();
     void OnlineCheck();
     void EnableCheck();
     void ModeCheck();
+
+    void PubComData();
+    void PubDevInfo();
+    void SubVelData();
+    void SubComData();
+    void SubCtrlData();
 
     void DevReset();
     void DevClear();

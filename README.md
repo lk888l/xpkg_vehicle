@@ -49,7 +49,6 @@ json out list(/xtopic_vehicle/device_state_json)
         4) (bool) beep_state :                      0=off 1=on
         5) (bool) brake_state :                     0=off 1=on
         6) (unsigned char) work_mode :              0=standby 1=remote 2=CAN 3=free
-        7) (bool) rotate_mode :                     0=angle vel 1=angle(for Ackermann model)
         8) (bool) spec_func_state :                 0=off 1=on, cheak datasheet for special function details
         9) (float) battery_vol :                    (V) voltage of battery
         10) (unsigned char) err_motor :             motor error code(check manual for details)

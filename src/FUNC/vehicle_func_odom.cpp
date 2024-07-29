@@ -231,13 +231,33 @@ void VehicleFuncOdom::CalcWithOdom(double v_r,double odom_l,double odom_r,double
     {
         if(m_track_width == 999.0)
         {
-            ros_interface.ROSLog(LogLevel::kError," xnode_vehicle: Unknown WHEEL BASE for odom calculation");
+            ros_interface.ROSLog(LogLevel::kError," xnode_vehicle: Unknown TRACK WIDTH for odom calculation");
             ros_interface.Shutdown();
             return;
         }
         d_avg_x = (d_odom_l+d_odom_r) * sqrt(3) / 3.0;
         d_avg_y = d_odom_l_s * 2 / 3 + (d_odom_r - d_odom_l) / 3 ;
         d_th = (d_odom_r - d_odom_l - d_odom_l_s) / m_track_width / sqrt(3);
+    }
+    /////////////////////////////////////////////////////////////////////////////////////////////////////////
+    if(m_model.compare("Quad_omni")==0)
+    {
+        if(m_track_width == 999.0)
+        {
+            ros_interface.ROSLog(LogLevel::kError," xnode_vehicle: Unknown WHEEL BASE for odom calculation");
+            ros_interface.Shutdown();
+            return;
+        }
+        if(m_track_width == 999.0)
+        {
+            ros_interface.ROSLog(LogLevel::kError," xnode_vehicle: Unknown TRACK WIDTH for odom calculation");
+            ros_interface.Shutdown();
+            return;
+        }
+
+        d_avg_x = (d_odom_l+d_odom_r+d_odom_r_s+d_odom_l_s) * sqrt(3) / 6.0;
+     //  d_avg_y = d_odom_l_s * 2 / 3 + (d_odom_r - d_odom_l) / 3 ;
+     //   d_th = (d_odom_r - d_odom_l - d_odom_l_s) / m_track_width / sqrt(3);
     }
     ////////////////////////////////////////////////////////////////////////////////
     if(d_avg_x>0.5 || d_avg_x<-0.5)d_avg_x = d_avg_last;

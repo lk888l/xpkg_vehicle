@@ -244,9 +244,9 @@ void VehicleFunc::ModeCheck()
     }
 }
 /*------------------------------------------------------------------------------------------------------------------
- * name: ComDataOut
+ * name: PubComData
  -----------------------------------------------------------------------------------------------------------------*/
-void VehicleFunc::ComDataOut()
+void VehicleFunc::PubComData()
 {
     if(f_new_vel == false)return;
     ROSInterface& ros_interface = ROSInterface::GetInterface();
@@ -257,10 +257,10 @@ void VehicleFunc::ComDataOut()
     f_new_vel = false;
 }
 /*------------------------------------------------------------------------------------------------------------------
- * name: JsonDataOut
+ * name: PubDevInfo
  * detail: Pub vehicle info
  -----------------------------------------------------------------------------------------------------------------*/
-void VehicleFunc::DevInfoOut()
+void VehicleFunc::PubDevInfo()
 {
     if(f_online == false)return;
     ROSInterface& ros_interface = ROSInterface::GetInterface();
@@ -296,9 +296,9 @@ void VehicleFunc::DevInfoOut()
     ros_interface.PubDevState(send_data);
 }
 /*------------------------------------------------------------------------------------------------------------------
- * name: VelDataIn
+ * name: SubVelData
  -----------------------------------------------------------------------------------------------------------------*/
-void VehicleFunc::VelDataIn()
+void VehicleFunc::SubVelData()
 {
     ROSInterface& ros_interface = ROSInterface::GetInterface();
     if(ros_interface.GetVelFlag() == 0)return;
@@ -309,10 +309,45 @@ void VehicleFunc::VelDataIn()
     ros_interface.ClearVelMsg();
 }
 /*------------------------------------------------------------------------------------------------------------------
- * name: ComDataIn
+ * name: SubCtrlData
+ -----------------------------------------------------------------------------------------------------------------*/
+void VehicleFunc::SubCtrlData()
+{
+    ROSInterface& ros_interface = ROSInterface::GetInterface();
+    unsigned char buff_mode;
+    bool buff_beep,buff_brake,buff_func;
+    if(ros_interface.GetJsonCtrlFlag() == true)
+    {
+        m_data_ctrl = ros_interface.GetJsonCtrlMsg();
+        ros_interface.ResetJsonCtrlFlag();
+        ros_interface.ClearJsonCtrlMsg();
+        DynamicJsonDocument doc(1024);
+        deserializeJson(doc, m_data_ctrl);
+        if(doc.containsKey("work_mode"))buff_mode = doc["work_mode"];
+        else buff_mode = m_dev_info.s_work_mode;
+        if(doc.containsKey("beep_state"))buff_beep = doc["beep_state"];
+        else buff_beep = m_dev_info.s_beep_state;
+        if(doc.containsKey("brake_state"))buff_brake = doc["brake_state"];
+        else buff_brake = m_dev_info.s_brake_state;
+        if(doc.containsKey("spec_func_state"))buff_func = doc["spec_func_state"];
+        else buff_func = m_dev_info.s_func_state;
+        if(doc.containsKey("err_clear") && doc["err_clear"] == true)DevClear();
+        if(buff_mode != m_dev_info.s_work_mode || buff_beep != m_dev_info.s_beep_state || buff_brake != m_dev_info.s_brake_state || buff_func != m_dev_info.s_func_state)
+        {
+            if(ros_interface.m_mode_can_lock && buff_mode != m_dev_info.s_work_mode)
+            {
+                DevMode(m_dev_info.s_work_mode,buff_beep,buff_brake,buff_func);
+                ros_interface.ROSLog(LogLevel::kWarn,"\033[1;32m %s: mode_can_lock is ON,mode ctrl is disable!\033[0m",DEV_NODE_NAME);
+            }else DevMode(buff_mode,buff_beep,buff_brake,buff_func);
+
+        }
+    }
+}
+/*------------------------------------------------------------------------------------------------------------------
+ * name: SubComData
  * detail: Convert data from COM to std dev status
  -----------------------------------------------------------------------------------------------------------------*/
-void VehicleFunc::ComDataIn()
+void VehicleFunc::SubComData()
 {
     ROSInterface& ros_interface = ROSInterface::GetInterface();
     if(ros_interface.GetComXstdFlag() == 0)return;
@@ -433,41 +468,7 @@ void VehicleFunc::ComDataIn()
     ros_interface.ResetComXstdFlag();
     ros_interface.ClearComXstdMsg();
 }
-/*------------------------------------------------------------------------------------------------------------------
- * name: CtrlDataIn
- -----------------------------------------------------------------------------------------------------------------*/
-void VehicleFunc::CtrlDataIn()
-{
-    ROSInterface& ros_interface = ROSInterface::GetInterface();
-    unsigned char buff_mode;
-    bool buff_beep,buff_brake,buff_func;
-    if(ros_interface.GetJsonCtrlFlag() == true)
-    {
-        m_data_ctrl = ros_interface.GetJsonCtrlMsg();
-        ros_interface.ResetJsonCtrlFlag();
-        ros_interface.ClearJsonCtrlMsg();
-        DynamicJsonDocument doc(1024);
-        deserializeJson(doc, m_data_ctrl);
-        if(doc.containsKey("work_mode"))buff_mode = doc["work_mode"];
-        else buff_mode = m_dev_info.s_work_mode;
-        if(doc.containsKey("beep_state"))buff_beep = doc["beep_state"];
-        else buff_beep = m_dev_info.s_beep_state;
-        if(doc.containsKey("brake_state"))buff_brake = doc["brake_state"];
-        else buff_brake = m_dev_info.s_brake_state;
-        if(doc.containsKey("spec_func_state"))buff_func = doc["spec_func_state"];
-        else buff_func = m_dev_info.s_func_state;
-        if(doc.containsKey("err_clear") && doc["err_clear"] == true)DevClear();
-        if(buff_mode != m_dev_info.s_work_mode || buff_beep != m_dev_info.s_beep_state || buff_brake != m_dev_info.s_brake_state || buff_func != m_dev_info.s_func_state)
-        {
-            if(ros_interface.m_mode_can_lock && buff_mode != m_dev_info.s_work_mode)
-            {
-                DevMode(m_dev_info.s_work_mode,buff_beep,buff_brake,buff_func);
-                ros_interface.ROSLog(LogLevel::kWarn,"\033[1;32m %s: mode_can_lock is ON,mode ctrl is disable!\033[0m",DEV_NODE_NAME);
-            }else DevMode(buff_mode,buff_beep,buff_brake,buff_func);
 
-        }
-    }
-}
 /*------------------------------------------------------------------------------------------------------------------
  * name: DevReset
  * detail: Vehicle reset CMD
