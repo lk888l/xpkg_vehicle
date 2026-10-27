@@ -5,6 +5,7 @@
 - 工作目录：`/home/kk/kk_data/ros2_project/vehicle_socketcan`
 - Git 分支：`refactor/socketcan-jazzy`，由 `main@f90f687` 创建 worktree。
 - 旧工程仍在 `../xpkg_vehicle` 的 `main` 分支。
+- 图形控制台：[PyQt5 使用说明](docs/gui.md)，通过 ROS 2 操作及显示底盘。
 - 实机结果：[验收报告](docs/validation.md)、[原始统计](artifacts/hardware_acceptance_2026-10-27.json)。低速精度尚未通过验收。
 
 ## 构建与启动
@@ -12,9 +13,12 @@
 宿主机现有 `ros2_jazzy` 容器采用 host 网络，父目录映射到容器 `/workspace`。在本工程目录运行：
 
 ```bash
+./tools/dev.sh gui-setup  # 首次准备 GUI 依赖；已有时不会重复安装
 ./tools/dev.sh build
 ./tools/dev.sh test
-./tools/dev.sh run
+./tools/dev.sh gui        # 同时启动驱动与图形控制台
+# 只运行驱动：./tools/dev.sh run
+# 驱动已运行：./tools/dev.sh gui start_driver:=false
 ```
 
 或在容器中：
@@ -22,6 +26,7 @@
 ```bash
 source /opt/ros/jazzy/setup.bash
 cd /workspace/vehicle_socketcan
+bash tools/install_gui_deps.sh
 colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo
 source install/setup.bash
 ros2 launch vehicle_driver vehicle.launch.py can_interface:=can0
@@ -142,4 +147,4 @@ python3 tools/hardware_acceptance.py --interface can0 --motion \
 
 `tools/dev.sh build` 以宿主用户 UID/GID 构建；容器 root 运行测试产生的日志可能为 root 所有。可通过 `VEHICLE_CONTAINER`、`VEHICLE_CONTAINER_PATH` 覆盖容器名和挂载路径。
 
-目录及设计依据见[架构说明](docs/architecture.md)。协议与运行证据明确区分已实测字段、继承但未验证的字段、未知字段。
+四个包分别负责纯 C++ 协议与通信、消息接口、ROS 驱动、PyQt5 GUI。目录及设计依据见[架构说明](docs/architecture.md)。协议与运行证据明确区分已实测字段、继承但未验证的字段、未知字段。

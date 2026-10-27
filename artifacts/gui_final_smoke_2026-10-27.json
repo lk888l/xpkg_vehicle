@@ -1,0 +1,115 @@
+{
+  "started_utc": "2026-10-27T10:57:34.811252+00:00",
+  "interface": "can0",
+  "source": "actual Qt buttons, ROS 2 driver and physical SocketCAN device",
+  "checks": {
+    "version_from_service": true,
+    "four_driver_channels": true,
+    "velocity_received": true,
+    "odom_received": true,
+    "can_frames_received": true,
+    "plots_populated": true,
+    "disable_confirmed": true,
+    "gui_worker_joined": true
+  },
+  "startup_settle_s": 0.3,
+  "version_result": {
+    "kind": "command",
+    "command": 2,
+    "fields": {},
+    "sent": true,
+    "acknowledged": true,
+    "state_confirmed": true,
+    "message": "ASCII A2 version received",
+    "hardware_version": "3.0",
+    "software_version": "4.0"
+  },
+  "observed_state": {
+    "online": true,
+    "enabled": true,
+    "heartbeat_received": true,
+    "status_received": true,
+    "heartbeat_age": 0.1001429145012207,
+    "status_age": 0.00019514050122071414,
+    "mode": 2,
+    "voltage": 27.8,
+    "work_state": 0,
+    "beep": false,
+    "flags_raw": 32
+  },
+  "velocity_samples": 37,
+  "driver_states": {
+    "0": {
+      "voltage": 27.8,
+      "current": 0.1,
+      "driver_temperature": 25,
+      "motor_temperature": 23,
+      "faults_raw": 0
+    },
+    "1": {
+      "voltage": 27.8,
+      "current": 0.0,
+      "driver_temperature": 25,
+      "motor_temperature": 19,
+      "faults_raw": 0
+    },
+    "2": {
+      "voltage": 27.8,
+      "current": 0.0,
+      "driver_temperature": 26,
+      "motor_temperature": 28,
+      "faults_raw": 0
+    },
+    "3": {
+      "voltage": 27.8,
+      "current": 0.0,
+      "driver_temperature": 26,
+      "motor_temperature": 19,
+      "faults_raw": 0
+    }
+  },
+  "disable_result": {
+    "kind": "command",
+    "command": 3,
+    "fields": {
+      "enabled": false
+    },
+    "sent": true,
+    "acknowledged": true,
+    "state_confirmed": true,
+    "message": "A3 received and new B0 enabled state matched",
+    "hardware_version": "",
+    "software_version": ""
+  },
+  "final_state": {
+    "online": true,
+    "enabled": false,
+    "heartbeat_received": true,
+    "status_received": true,
+    "heartbeat_age": 0.00032792628283691283,
+    "status_age": 0.5963291132828369,
+    "mode": 2,
+    "voltage": 27.8,
+    "work_state": 0,
+    "beep": false,
+    "flags_raw": 32
+  },
+  "diagnostics": {
+    "level": 0,
+    "message": "Online, disabled",
+    "heartbeat_age_s": "0.223981",
+    "status_age_s": "0.319995",
+    "velocity_age_s": "0.242243",
+    "rx_frames": "194",
+    "tx_frames": "21",
+    "malformed_frames": "0",
+    "can_error_frames": "0",
+    "rx_errors": "0",
+    "tx_errors": "0",
+    "socket_dropped_frames": "0",
+    "rejected_commands": "0",
+    "command_active": "1",
+    "odometry_discontinuities": "1"
+  },
+  "finished_utc": "2026-10-27T10:57:37.493703+00:00"
+}

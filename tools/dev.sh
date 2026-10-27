@@ -24,5 +24,12 @@ case "$action" in
       exec ros2 launch vehicle_driver vehicle.launch.py
     ' _ "$container_path"
     ;;
-  *) printf 'Usage: %s {build|test|run}\n' "$0" >&2; exit 2 ;;
+  gui-setup)
+    docker exec "$container" bash -c 'cd -- "$1"; exec bash tools/install_gui_deps.sh' _ "$container_path"
+    ;;
+  gui)
+    shift
+    exec bash "$repo/tools/gui.sh" "$@"
+    ;;
+  *) printf 'Usage: %s {build|test|run|gui-setup|gui}\n' "$0" >&2; exit 2 ;;
 esac

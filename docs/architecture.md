@@ -4,8 +4,11 @@
 
 ```mermaid
 flowchart LR
-  Cmd[TwistStamped / Twist] --> Node[vehicle_driver::VehicleNode]
-  Svc[Command service] --> Node
+  Gui[vehicle_gui / PyQt5 + rclpy] --> Cmd[TwistStamped / Twist]
+  Gui --> Svc[Command service]
+  Output --> Gui
+  Cmd --> Node[vehicle_driver::VehicleNode]
+  Svc --> Node
   Node --> Codec[vehicle_core codec / variant events]
   Node --> Odom[Odometry / CommandBuffer]
   Codec --> Transport[CanTransport interface]
@@ -18,6 +21,7 @@ flowchart LR
 - `vehicle_core`：不包含 ROS 头文件。协议编码/解码为纯函数；`std::variant` 表达不同反馈，避免共享万能数组及隐式有效位。`CanTransport` 是传输端口，`SocketCan` 是 Linux 适配器，文件描述符 RAII 管理；以后可替换为回放或其他测试实现。
 - `vehicle_interfaces`：只放消息与服务，不依赖驱动实现；上层应用无需依赖 SocketCAN。
 - `vehicle_driver`：ROS 适配与设备会话的组合入口。显式拥有配置、命令缓存、SocketCAN、里程计和待应答事务；没有 singleton、跨节点共享可变静态变量或 ROS 1/2 条件编译。
+- `vehicle_gui`：独立 Python 展示层，View/ViewModel 与 rclpy 适配器分离；主线程处理 Qt，工作线程处理 DDS，不打开 CAN。遥测通过有界线程安全快照传递，运动输入必须持续续期。细节见[GUI 使用与设计](gui.md)。
 
 没有强行引入 `ros2_control` 的轮速控制器：当前固件已经提供整车 vx/wz 控制，轮径、减速比、有效轮距均未独立校准。增加轮级 hardware interface 会引入未经验证的单位和重复控制环。后续若确认轮级协议，可在稳定的传输端口旁扩展，不需要修改现有整车协议。
 

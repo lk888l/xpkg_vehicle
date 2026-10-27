@@ -1,0 +1,114 @@
+{
+  "started_utc": "2026-10-27T10:51:45.764556+00:00",
+  "interface": "can0",
+  "source": "actual Qt buttons, ROS 2 driver and physical SocketCAN device",
+  "checks": {
+    "version_from_service": false,
+    "four_driver_channels": true,
+    "velocity_received": true,
+    "odom_received": true,
+    "can_frames_received": true,
+    "plots_populated": true,
+    "disable_confirmed": true,
+    "gui_worker_joined": true
+  },
+  "version_result": {
+    "kind": "command",
+    "command": 2,
+    "fields": {},
+    "sent": true,
+    "acknowledged": false,
+    "state_confirmed": false,
+    "message": "Feedback timeout or transport loss; inspect acknowledged/state_confirmed separately",
+    "hardware_version": "",
+    "software_version": ""
+  },
+  "observed_state": {
+    "online": true,
+    "enabled": true,
+    "heartbeat_received": true,
+    "status_received": true,
+    "heartbeat_age": 0.4002675845208741,
+    "status_age": 0.0002197595208740244,
+    "mode": 2,
+    "voltage": 27.8,
+    "work_state": 0,
+    "beep": false,
+    "flags_raw": 32
+  },
+  "velocity_samples": 78,
+  "driver_states": {
+    "0": {
+      "voltage": 27.8,
+      "current": 0.1,
+      "driver_temperature": 25,
+      "motor_temperature": 24,
+      "faults_raw": 0
+    },
+    "1": {
+      "voltage": 27.8,
+      "current": 0.1,
+      "driver_temperature": 25,
+      "motor_temperature": 19,
+      "faults_raw": 0
+    },
+    "2": {
+      "voltage": 27.8,
+      "current": 0.6,
+      "driver_temperature": 26,
+      "motor_temperature": 28,
+      "faults_raw": 0
+    },
+    "3": {
+      "voltage": 27.8,
+      "current": 0.0,
+      "driver_temperature": 26,
+      "motor_temperature": 20,
+      "faults_raw": 0
+    }
+  },
+  "disable_result": {
+    "kind": "command",
+    "command": 3,
+    "fields": {
+      "enabled": false
+    },
+    "sent": true,
+    "acknowledged": true,
+    "state_confirmed": true,
+    "message": "A3 received and new B0 enabled state matched",
+    "hardware_version": "",
+    "software_version": ""
+  },
+  "final_state": {
+    "online": true,
+    "enabled": false,
+    "heartbeat_received": true,
+    "status_received": true,
+    "heartbeat_age": 0.00040424442333984734,
+    "status_age": 0.7983512644233399,
+    "mode": 2,
+    "voltage": 27.8,
+    "work_state": 0,
+    "beep": false,
+    "flags_raw": 32
+  },
+  "diagnostics": {
+    "level": 0,
+    "message": "Online, disabled",
+    "heartbeat_age_s": "0.183999",
+    "status_age_s": "0.481973",
+    "velocity_age_s": "0.403992",
+    "rx_frames": "331",
+    "tx_frames": "12",
+    "malformed_frames": "0",
+    "can_error_frames": "0",
+    "rx_errors": "0",
+    "tx_errors": "0",
+    "socket_dropped_frames": "0",
+    "rejected_commands": "0",
+    "command_active": "0",
+    "odometry_discontinuities": "1"
+  },
+  "finished_utc": "2026-10-27T10:51:49.489861+00:00"
+}

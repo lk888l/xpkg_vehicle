@@ -1,0 +1,168 @@
+{
+  "started_utc": "2026-10-27T10:53:50.430016+00:00",
+  "description": "Read-only version queries while disabled; scheduled timestamps relative to start",
+  "planned_offsets_s": [
+    0.0,
+    0.15,
+    0.5,
+    1.05,
+    1.9,
+    3.0,
+    4.5,
+    6.5
+  ],
+  "events": [
+    {
+      "kind": "query",
+      "offset_s": 2.7e-05
+    },
+    {
+      "kind": "version",
+      "offset_s": 0.000734,
+      "data": "332e3000342e3000"
+    },
+    {
+      "kind": "query",
+      "offset_s": 0.150496
+    },
+    {
+      "kind": "version",
+      "offset_s": 0.152829,
+      "data": "332e3000342e3000"
+    },
+    {
+      "kind": "heartbeat",
+      "offset_s": 0.186747,
+      "data": "00"
+    },
+    {
+      "kind": "query",
+      "offset_s": 0.503356
+    },
+    {
+      "kind": "version",
+      "offset_s": 0.504855,
+      "data": "332e3000342e3000"
+    },
+    {
+      "kind": "heartbeat",
+      "offset_s": 0.687441,
+      "data": "00"
+    },
+    {
+      "kind": "query",
+      "offset_s": 1.052638
+    },
+    {
+      "kind": "version",
+      "offset_s": 1.054783,
+      "data": "332e3000342e3000"
+    },
+    {
+      "kind": "heartbeat",
+      "offset_s": 1.187072,
+      "data": "00"
+    },
+    {
+      "kind": "heartbeat",
+      "offset_s": 1.686764,
+      "data": "00"
+    },
+    {
+      "kind": "query",
+      "offset_s": 1.901435
+    },
+    {
+      "kind": "version",
+      "offset_s": 1.902815,
+      "data": "332e3000342e3000"
+    },
+    {
+      "kind": "heartbeat",
+      "offset_s": 2.186982,
+      "data": "00"
+    },
+    {
+      "kind": "heartbeat",
+      "offset_s": 2.686773,
+      "data": "00"
+    },
+    {
+      "kind": "query",
+      "offset_s": 3.000385
+    },
+    {
+      "kind": "version",
+      "offset_s": 3.002914,
+      "data": "332e3000342e3000"
+    },
+    {
+      "kind": "heartbeat",
+      "offset_s": 3.186976,
+      "data": "00"
+    },
+    {
+      "kind": "heartbeat",
+      "offset_s": 3.686789,
+      "data": "00"
+    },
+    {
+      "kind": "heartbeat",
+      "offset_s": 4.186991,
+      "data": "00"
+    },
+    {
+      "kind": "query",
+      "offset_s": 4.500939
+    },
+    {
+      "kind": "version",
+      "offset_s": 4.502882,
+      "data": "332e3000342e3000"
+    },
+    {
+      "kind": "heartbeat",
+      "offset_s": 4.687103,
+      "data": "00"
+    },
+    {
+      "kind": "heartbeat",
+      "offset_s": 5.186982,
+      "data": "00"
+    },
+    {
+      "kind": "heartbeat",
+      "offset_s": 5.687083,
+      "data": "00"
+    },
+    {
+      "kind": "heartbeat",
+      "offset_s": 6.187023,
+      "data": "00"
+    },
+    {
+      "kind": "query",
+      "offset_s": 6.504543
+    },
+    {
+      "kind": "version",
+      "offset_s": 6.506905,
+      "data": "332e3000342e3000"
+    },
+    {
+      "kind": "heartbeat",
+      "offset_s": 6.686847,
+      "data": "00"
+    },
+    {
+      "kind": "heartbeat",
+      "offset_s": 7.18699,
+      "data": "00"
+    },
+    {
+      "kind": "heartbeat",
+      "offset_s": 7.68701,
+      "data": "00"
+    }
+  ]
+}
