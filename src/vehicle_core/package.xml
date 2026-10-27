@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>vehicle_core</name><version>1.0.0</version>
+  <description>ROS-independent MARK1 CAN codec, SocketCAN transport and differential odometry.</description>
+  <maintainer email="207119930@qq.com">Luka</maintainer><license>Apache-2.0</license>
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <test_depend>ament_cmake_gtest</test_depend>
+  <export><build_type>ament_cmake</build_type></export>
+</package>

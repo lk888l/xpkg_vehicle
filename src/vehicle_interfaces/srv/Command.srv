@@ -1,0 +1,29 @@
+uint8 RESET=1
+uint8 QUERY_VERSION=2
+uint8 ENABLE=3
+uint8 CLEAR_FAULTS=4
+uint8 ZERO_MOTION=5
+uint8 SET_MODE=17
+uint8 REMOTE_FEEDBACK=21
+uint8 SENSOR_FEEDBACK=22
+uint8 DRIVER_MOTION_FEEDBACK=23
+uint8 DRIVER_STATUS_FEEDBACK=24
+uint8 command
+# ENABLE and feedback switches use enabled.
+bool enabled
+# SET_MODE uses the following four fields.
+uint8 mode
+bool beep
+bool brake
+bool special
+---
+# sent only means written to the local SocketCAN socket.
+bool sent
+# acknowledged means a matching A2/A3/A4/A5 was observed after sending.
+bool acknowledged
+# ENABLE: new B0 matches. SET_MODE: new B1 mode/beep match only.
+# QUERY_VERSION: A2 decoded. Other operations never claim physical confirmation.
+bool state_confirmed
+string message
+string hardware_version
+string software_version

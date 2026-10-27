@@ -1,0 +1,18 @@
+cmake_minimum_required(VERSION 3.16)
+project(vehicle_core VERSION 1.0.0 LANGUAGES CXX)
+find_package(ament_cmake REQUIRED)
+add_library(${PROJECT_NAME} SHARED src/protocol.cpp src/socketcan.cpp src/odometry.cpp)
+target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)
+target_include_directories(${PROJECT_NAME} PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:include>)
+target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wpedantic -Wconversion -Wshadow)
+install(TARGETS ${PROJECT_NAME} EXPORT export_${PROJECT_NAME}
+  ARCHIVE DESTINATION lib LIBRARY DESTINATION lib RUNTIME DESTINATION bin)
+install(DIRECTORY include/ DESTINATION include)
+if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
+  ament_add_gtest(test_core test/test_core.cpp)
+  target_link_libraries(test_core ${PROJECT_NAME})
+endif()
+ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
+ament_package()

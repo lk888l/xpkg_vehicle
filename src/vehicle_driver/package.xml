@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>vehicle_driver</name><version>1.0.0</version>
+  <description>Composable ROS 2 Jazzy SocketCAN driver for MARK1_DIFF.</description>
+  <maintainer email="207119930@qq.com">Luka</maintainer><license>Apache-2.0</license>
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <depend>vehicle_core</depend><depend>vehicle_interfaces</depend>
+  <depend>rclcpp</depend><depend>rclcpp_components</depend>
+  <depend>geometry_msgs</depend><depend>nav_msgs</depend>
+  <depend>std_srvs</depend><depend>diagnostic_msgs</depend><depend>tf2_ros</depend>
+  <exec_depend>launch_ros</exec_depend><exec_depend>ament_index_python</exec_depend>
+  <test_depend>ament_cmake_pytest</test_depend><test_depend>rclpy</test_depend>
+  <export><build_type>ament_cmake</build_type></export>
+</package>

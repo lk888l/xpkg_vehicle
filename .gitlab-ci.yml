@@ -1,4 +1,23 @@
-include:
-  - project: 'rosdev/public-ref'
-    ref: main
-    file: 'xpkg-ci/.gitlab-ci.yml'
+image: ros:jazzy-ros-base
+stages: [verify]
+# The Docker runner needs CAP_NET_ADMIN (or privileged=true) and vcan kernel support.
+# All injected frames go to vcan_veh_test; no physical device is used by CI.
+verify:
+  stage: verify
+  before_script:
+    - apt-get update -qq
+    - apt-get install -y -qq iproute2 g++ python3-colcon-common-extensions python3-pytest python3-rosdep
+    - rosdep update --rosdistro jazzy
+    - rosdep install --from-paths src --ignore-src --rosdistro jazzy -y
+  script:
+    - source /opt/ros/jazzy/setup.bash
+    - colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo
+    - bash tools/test.sh
+    - bash tools/sanitizers.sh
+  artifacts:
+    when: always
+    paths: [log/, build/vehicle_core/test_results/, build/vehicle_driver/test_results/]
+    reports:
+      junit:
+        - build/vehicle_core/test_results/vehicle_core/*.xml
+        - build/vehicle_driver/test_results/vehicle_driver/*.xml

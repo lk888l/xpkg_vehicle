@@ -1,0 +1,6 @@
+MARK1 SocketCAN ROS 2 driver
+
+Reimplemented from the CAN message definitions in xpkg_vehicle (author: shadows,
+original package license: Apache 2.0) and device observations supplied by the user.
+Legacy source remains in Git history at f90f687 and on the main branch.
+Third-party ArduinoJson source is no longer distributed in this branch.

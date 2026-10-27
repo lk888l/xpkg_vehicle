@@ -1,0 +1,527 @@
+{
+  "started_utc": "2026-10-27T09:10:38.533284+00:00",
+  "interface": "can0",
+  "phases": [],
+  "services": [
+    {
+      "command": 2,
+      "fields": {},
+      "elapsed_s": 0.0017849939977168106,
+      "sent": true,
+      "acknowledged": true,
+      "state_confirmed": true,
+      "message": "ASCII A2 version received",
+      "hardware_version": "3.0",
+      "software_version": "4.0"
+    },
+    {
+      "command": 3,
+      "fields": {
+        "enabled": true
+      },
+      "elapsed_s": 0.19604993800021475,
+      "sent": true,
+      "acknowledged": true,
+      "state_confirmed": true,
+      "message": "A3 received and new B0 enabled state matched",
+      "hardware_version": "",
+      "software_version": ""
+    },
+    {
+      "command": 4,
+      "fields": {},
+      "elapsed_s": 0.03196394699989469,
+      "sent": true,
+      "acknowledged": true,
+      "state_confirmed": false,
+      "message": "Command receipt acknowledged; physical effect is not proven by ACK",
+      "hardware_version": "",
+      "software_version": ""
+    },
+    {
+      "command": 17,
+      "fields": {
+        "mode": 2,
+        "beep": true
+      },
+      "elapsed_s": 0.1260507980005059,
+      "sent": true,
+      "acknowledged": false,
+      "state_confirmed": true,
+      "message": "New B1 mode/beep matched; brake and special-function effects remain unverified",
+      "hardware_version": "",
+      "software_version": ""
+    },
+    {
+      "command": 17,
+      "fields": {
+        "mode": 2,
+        "beep": false
+      },
+      "elapsed_s": 0.0419118299978436,
+      "sent": true,
+      "acknowledged": false,
+      "state_confirmed": true,
+      "message": "New B1 mode/beep matched; brake and special-function effects remain unverified",
+      "hardware_version": "",
+      "software_version": ""
+    },
+    {
+      "command": 21,
+      "fields": {
+        "enabled": false
+      },
+      "elapsed_s": 0.00019125100152450614,
+      "sent": true,
+      "acknowledged": false,
+      "state_confirmed": false,
+      "message": "Feedback switch sent; protocol has no ACK for this command; inspect telemetry",
+      "hardware_version": "",
+      "software_version": ""
+    },
+    {
+      "command": 21,
+      "fields": {
+        "enabled": true
+      },
+      "elapsed_s": 0.0002556330000516027,
+      "sent": true,
+      "acknowledged": false,
+      "state_confirmed": false,
+      "message": "Feedback switch sent; protocol has no ACK for this command; inspect telemetry",
+      "hardware_version": "",
+      "software_version": ""
+    },
+    {
+      "command": 23,
+      "fields": {
+        "enabled": false
+      },
+      "elapsed_s": 0.00029382600041572005,
+      "sent": true,
+      "acknowledged": false,
+      "state_confirmed": false,
+      "message": "Feedback switch sent; protocol has no ACK for this command; inspect telemetry",
+      "hardware_version": "",
+      "software_version": ""
+    },
+    {
+      "command": 23,
+      "fields": {
+        "enabled": true
+      },
+      "elapsed_s": 0.0003356749984959606,
+      "sent": true,
+      "acknowledged": false,
+      "state_confirmed": false,
+      "message": "Feedback switch sent; protocol has no ACK for this command; inspect telemetry",
+      "hardware_version": "",
+      "software_version": ""
+    },
+    {
+      "command": 24,
+      "fields": {
+        "enabled": false
+      },
+      "elapsed_s": 0.00035771599868894555,
+      "sent": true,
+      "acknowledged": false,
+      "state_confirmed": false,
+      "message": "Feedback switch sent; protocol has no ACK for this command; inspect telemetry",
+      "hardware_version": "",
+      "software_version": ""
+    },
+    {
+      "command": 24,
+      "fields": {
+        "enabled": true
+      },
+      "elapsed_s": 0.00035116399885737337,
+      "sent": true,
+      "acknowledged": false,
+      "state_confirmed": false,
+      "message": "Feedback switch sent; protocol has no ACK for this command; inspect telemetry",
+      "hardware_version": "",
+      "software_version": ""
+    },
+    {
+      "command": 21,
+      "fields": {
+        "enabled": false
+      },
+      "elapsed_s": 0.00023323099958361126,
+      "sent": true,
+      "acknowledged": false,
+      "state_confirmed": false,
+      "message": "Feedback switch sent; protocol has no ACK for this command; inspect telemetry",
+      "hardware_version": "",
+      "software_version": ""
+    },
+    {
+      "command": 22,
+      "fields": {
+        "enabled": true
+      },
+      "elapsed_s": 0.0001146160029747989,
+      "sent": true,
+      "acknowledged": false,
+      "state_confirmed": false,
+      "message": "Feedback switch sent; protocol has no ACK for this command; inspect telemetry",
+      "hardware_version": "",
+      "software_version": ""
+    },
+    {
+      "command": 22,
+      "fields": {
+        "enabled": false
+      },
+      "elapsed_s": 0.00021242199727566913,
+      "sent": true,
+      "acknowledged": false,
+      "state_confirmed": false,
+      "message": "Feedback switch sent; protocol has no ACK for this command; inspect telemetry",
+      "hardware_version": "",
+      "software_version": ""
+    },
+    {
+      "command": 5,
+      "fields": {},
+      "elapsed_s": 0.0018775589996948838,
+      "sent": true,
+      "acknowledged": true,
+      "state_confirmed": false,
+      "message": "Command receipt acknowledged; physical effect is not proven by ACK",
+      "hardware_version": "",
+      "software_version": ""
+    },
+    {
+      "command": 3,
+      "fields": {
+        "enabled": false
+      },
+      "elapsed_s": 0.3818699520015798,
+      "sent": true,
+      "acknowledged": true,
+      "state_confirmed": true,
+      "message": "A3 received and new B0 enabled state matched",
+      "hardware_version": "",
+      "software_version": ""
+    }
+  ],
+  "checks": {
+    "ascii_version": true,
+    "enable_confirmed": true,
+    "clear_ack": true,
+    "beep_True": true,
+    "beep_False": true,
+    "feedback_B5": true,
+    "feedback_B7": true,
+    "feedback_B8": true,
+    "zero_ack": true,
+    "zero_mileage_observed": true,
+    "four_driver_channels": true,
+    "zero_pulses_observed": true,
+    "disable_confirmed": true
+  },
+  "driver_binary_sha256": "7a8b4479de0992232776c1dc4c2019c080b63796dd9fee671e2ad86342e93253",
+  "initial_state": {
+    "header": {
+      "stamp": {
+        "sec": 1793092240,
+        "nanosec": 312562632
+      },
+      "frame_id": "base_link"
+    },
+    "heartbeat_stamp": {
+      "sec": 1793092240,
+      "nanosec": 12636280
+    },
+    "status_stamp": {
+      "sec": 1793092240,
+      "nanosec": 312562632
+    },
+    "heartbeat_received": true,
+    "status_received": true,
+    "online": true,
+    "enabled": true,
+    "work_state": 0,
+    "mode": 2,
+    "battery_voltage": 27.9,
+    "beep": false,
+    "flags_raw": 32
+  },
+  "feedback_B5_counts": {
+    "False": 0,
+    "True": 24
+  },
+  "feedback_B7_counts": {
+    "False": 0,
+    "True": 25
+  },
+  "feedback_B8_counts": {
+    "False": 0,
+    "True": 5
+  },
+  "sensor_B6_observed": 0,
+  "diagnostics": {
+    "header": {
+      "stamp": {
+        "sec": 1793092246,
+        "nanosec": 616578431
+      },
+      "frame_id": ""
+    },
+    "status": [
+      {
+        "level": "\u0000",
+        "name": "/vehicle/socketcan",
+        "message": "Online, disabled",
+        "hardware_id": "can0:31523072",
+        "values": [
+          {
+            "key": "heartbeat_age_s",
+            "value": "0.106000"
+          },
+          {
+            "key": "status_age_s",
+            "value": "0.503977"
+          },
+          {
+            "key": "velocity_age_s",
+            "value": "0.504001"
+          },
+          {
+            "key": "rx_frames",
+            "value": "1267"
+          },
+          {
+            "key": "tx_frames",
+            "value": "48"
+          },
+          {
+            "key": "malformed_frames",
+            "value": "0"
+          },
+          {
+            "key": "can_error_frames",
+            "value": "0"
+          },
+          {
+            "key": "rx_errors",
+            "value": "0"
+          },
+          {
+            "key": "tx_errors",
+            "value": "0"
+          },
+          {
+            "key": "socket_dropped_frames",
+            "value": "0"
+          },
+          {
+            "key": "rejected_commands",
+            "value": "0"
+          },
+          {
+            "key": "command_active",
+            "value": "0"
+          },
+          {
+            "key": "odometry_discontinuities",
+            "value": "1"
+          }
+        ]
+      }
+    ]
+  },
+  "final_state": {
+    "header": {
+      "stamp": {
+        "sec": 1793092246,
+        "nanosec": 616578431
+      },
+      "frame_id": "base_link"
+    },
+    "heartbeat_stamp": {
+      "sec": 1793092246,
+      "nanosec": 510578583
+    },
+    "status_stamp": {
+      "sec": 1793092246,
+      "nanosec": 112601616
+    },
+    "heartbeat_received": true,
+    "status_received": true,
+    "online": true,
+    "enabled": false,
+    "work_state": 0,
+    "mode": 2,
+    "battery_voltage": 27.9,
+    "beep": false,
+    "flags_raw": 32
+  },
+  "frame_counts": {
+    "050101B0": 19,
+    "050102B0": 19,
+    "050103B0": 18,
+    "050104B0": 18,
+    "01E101B0": 18,
+    "01E10102": 2,
+    "01E10103": 4,
+    "01E101A2": 2,
+    "01E101A3": 5,
+    "05010111": 331,
+    "05010113": 331,
+    "05010211": 331,
+    "05010213": 331,
+    "05010311": 331,
+    "05010313": 331,
+    "05010411": 331,
+    "01E101B2": 331,
+    "01E101B3": 331,
+    "01E101B7": 293,
+    "01E101B8": 61,
+    "05010413": 331,
+    "01E101B1": 68,
+    "01E10111": 3,
+    "01E10115": 4,
+    "01E10116": 3,
+    "01E10117": 3,
+    "01E10118": 3,
+    "05010103": 2,
+    "050101A3": 2,
+    "050101B2": 354,
+    "050101B3": 354,
+    "05010112": 1,
+    "05010203": 2,
+    "050102A3": 2,
+    "050101B1": 71,
+    "050102B1": 71,
+    "050102B2": 351,
+    "050102B3": 351,
+    "05010212": 1,
+    "05010303": 2,
+    "050103A3": 2,
+    "050103B2": 348,
+    "050103B3": 348,
+    "05010312": 1,
+    "050103B1": 69,
+    "05010403": 2,
+    "050104A3": 2,
+    "050104B2": 344,
+    "050104B3": 344,
+    "05010412": 1,
+    "05010115": 1,
+    "050101B5": 1,
+    "050104B1": 68,
+    "05010215": 1,
+    "050102B5": 1,
+    "05010315": 1,
+    "050103B5": 1,
+    "05010415": 1,
+    "050104B5": 1,
+    "01E10104": 1,
+    "01E101A4": 1,
+    "05010104": 1,
+    "050101A4": 1,
+    "01E10112": 26,
+    "05010204": 1,
+    "050102A4": 1,
+    "05010304": 1,
+    "050103A4": 1,
+    "05010404": 1,
+    "050104A4": 1,
+    "01E101B5": 160,
+    "01E10105": 1,
+    "01E101A5": 1,
+    "05010105": 1,
+    "05010205": 1,
+    "050101A5": 1,
+    "05010305": 1,
+    "050102A5": 1,
+    "05010405": 1,
+    "050103A5": 1,
+    "050104A5": 1
+  },
+  "feedback_summary": {
+    "B0": {
+      "lengths": [
+        1
+      ],
+      "frames": 18,
+      "median_period_s": 0.500004675002856
+    },
+    "A2": {
+      "lengths": [
+        8
+      ],
+      "frames": 2,
+      "median_period_s": 1.3046496720016876
+    },
+    "A3": {
+      "lengths": [
+        0
+      ],
+      "frames": 5,
+      "median_period_s": 1.0508637849998195
+    },
+    "B2": {
+      "lengths": [
+        6
+      ],
+      "frames": 331,
+      "median_period_s": 0.019999111998913577
+    },
+    "B3": {
+      "lengths": [
+        8
+      ],
+      "frames": 331,
+      "median_period_s": 0.019998260499050957
+    },
+    "B7": {
+      "lengths": [
+        7
+      ],
+      "frames": 293,
+      "median_period_s": 0.019997859499198967
+    },
+    "B8": {
+      "lengths": [
+        8
+      ],
+      "frames": 61,
+      "median_period_s": 0.09999801899903105
+    },
+    "B1": {
+      "lengths": [
+        6
+      ],
+      "frames": 68,
+      "median_period_s": 0.09999985700051184
+    },
+    "A4": {
+      "lengths": [
+        0
+      ],
+      "frames": 1,
+      "median_period_s": null
+    },
+    "B5": {
+      "lengths": [
+        7
+      ],
+      "frames": 160,
+      "median_period_s": 0.020007758001156617
+    },
+    "A5": {
+      "lengths": [
+        0
+      ],
+      "frames": 1,
+      "median_period_s": null
+    }
+  },
+  "finished_utc": "2026-10-27T09:10:47.628431+00:00",
+  "candump_sha256": "519b541ee061d635b790815f16893481e5758979d180c4718705b43cb231a2db"
+}

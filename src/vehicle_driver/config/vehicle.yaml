@@ -1,0 +1,28 @@
+/**:
+  ros__parameters:
+    can_interface: can0
+    device_type: 225
+    device_node: 1
+    auto_initialize: true
+    disable_on_shutdown: true
+    use_stamped_cmd_vel: true
+    command_rate: 50.0
+    command_timeout: 0.30
+    max_linear_speed: 1.0
+    max_angular_speed: 2.0
+    service_timeout: 1.20
+    heartbeat_timeout: 1.50
+    remote_feedback: false
+    sensor_feedback: false
+    driver_motion_feedback: true
+    driver_status_feedback: true
+    odom_source: velocity
+    # Required only for wheel_mileage mode: calibrate, do not guess physical geometry.
+    effective_track_width: 0.0
+    odom_frame: odom
+    base_frame: base_link
+    publish_tf: true
+    pose_variance_xy: 0.05
+    pose_variance_yaw: 0.10
+    twist_variance_linear: 0.02
+    twist_variance_angular: 0.05
