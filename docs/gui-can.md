@@ -1,6 +1,6 @@
 # GUI 功能与 CAN 帧对应关系
 
-本文按 `ac694f9` 的实现于 2026-10-28 核对，说明当前 GUI 的每项操作如何通过 ROS 2 产生 CAN 帧，以及各显示项从哪些反馈取得数据。使用默认 [vehicle.yaml](../src/vehicle_driver/config/vehicle.yaml)，设备为 MARK1_DIFF，身份 `class=01 / type=E1 / node=01`。操作方法见 [GUI 使用说明](gui.md)，底层字段与实测边界见 [协议说明](protocol.md)。
+本文于 2026-10-28 按当前实现核对，说明 GUI 的每项操作如何通过 ROS 2 产生 CAN 帧，以及各显示项从哪些反馈取得数据。使用默认 [vehicle.yaml](../src/vehicle_driver/config/vehicle.yaml)，设备为 MARK1_DIFF，身份 `class=01 / type=E1 / node=01`。操作方法见 [GUI 使用说明](gui.md)，底层字段与实测边界见 [协议说明](protocol.md)。
 
 ## 1. 数据经过哪些层
 
@@ -89,7 +89,7 @@ GUI 默认直行幅值为 0.10 m/s、旋转幅值为 0.20 rad/s。以下均为�
 | 应用模式与蜂鸣器 | `command=17, mode=m, beep=b` | `0x01E10111` / 4 / `m b 00 00` | 等新的 B1 中 D1=所选模式、D4=蜂鸣器设置；没有已知 `11` ACK |
 | 查询版本 | `command=2` | `0x01E10102` / 0 / 无载荷 | 收到 `0x01E101A2`（8 字节），解析两段各 4 字节 ASCII |
 | 清故障 | `command=4` | `0x01E10104` / 1 / `CC` | 收到 `0x01E101A4`（DLC=0）；只确认接收，仍需观察故障/状态反馈 |
-| 清运动计数 | `command=5` | `0x01E10105` / 1 / `CC` | 收到 `0x01E101A5`（DLC=0）；实际计数效果看 B3 左右里程和四路 B7 脉冲 |
+| 设备计数清零 | `command=5` | `0x01E10105` / 1 / `CC` | 收到 `0x01E101A5`（DLC=0）；实际计数效果看 B3 左右里程和四路 B7 脉冲 |
 
 模式字节 `m`：`00` 待机、`01` 遥控、`02` CAN、`03` 自由；蜂鸣器 `b` 为 `00/01`。例如选择 CAN 并勾选蜂鸣器，点击应用后主命令是 `01E10111#02010000`。更改下拉框或勾选框时不立即发帧，必须点击应用。
 
@@ -97,8 +97,8 @@ GUI 默认直行幅值为 0.10 m/s、旋转幅值为 0.20 rad/s。以下均为�
 
 ### 3.1 这些按钮是否先发零速
 
-- 点击**使能、失能、应用模式、清运动计数**时，GUI 先清除按住状态，并安排发布零速 ROS 命令。
-- 驱动收到**失能、应用模式、清运动计数**服务时，还会清空自己的速度缓存，在同一服务回调内先向 SocketCAN 写入 `01E10112#000000000000`，再写入上表主命令。这一前置顺序不依赖 GUI 零速消息何时到达。
+- 点击**使能、失能、应用模式、设备计数清零、里程计清零**时，GUI 先清除按住状态，并安排发布零速 ROS 命令。
+- 驱动收到**失能、应用模式、设备计数清零**服务时，还会清空自己的速度缓存，在同一服务回调内先向 SocketCAN 写入 `01E10112#000000000000`，再写入上表主命令。这一前置顺序不依赖 GUI 零速消息何时到达。
 - **使能**服务的驱动回调没有强制前置零速；它依赖 GUI 已结束手动运动。ROS 话题与服务是独立通道，不能保证 GUI 这一条零速与使能帧的跨通道先后顺序。
 - **查询版本、清故障**按钮本身不清空运动意图，也不额外插入零速；如果还持有有效方向输入，运动帧与服务查询可以并行进行。
 
@@ -171,13 +171,15 @@ GUI 主显示/绘图定时器为 50 ms，表格最多约每 250 ms 更新一次�
 
 | GUI 功能 | 实际行为 | 是否增加设备 CAN 命令 |
 |---|---|---|
-| 重置本地位姿 | 调用 `/vehicle/reset_odometry`（`std_srvs/Trigger`），重置驱动内的 ROS 位姿及积分基线；新的位姿在后续 odom 消息中更新 | 不发 `05`，不清 B3/B7；该操作本身也不请求停速 |
+| 里程计清零 | 先结束手动运动，再调用 `/vehicle/reset_odometry`（`std_srvs/Trigger`），重置驱动内的 ROS 位姿及积分基线；服务成功后清除 GUI 旧轨迹和旧位姿，丢弃排队的清零前 odom，等待新反馈。服务失败保留原显示数据 | 只增加停止路径的 `12` 零速；不发 `05`，不清 B3/B7 |
+| 仅清空轨迹 | 只清除 GUI 的 odom 历史，保留当前位姿、速度曲线和设备计数 | 无 |
+| 显示完整轨迹 | 恢复轨迹图自动缩放，使当前路径和位置完整可见 | 无 |
 | 清空图表 | 清除 GUI 的速度/指令/odom 历史缓冲；不清最新状态、不重置 ROS 位姿；后续数据继续绘制 | 无 |
 | 导出曲线 CSV | 先结束手动运动并安排一次零速 ROS 命令，再打开文件对话框、保存本地历史；取消对话框也已经触发停止 | 只增加停止路径的 `12` 零速；没有专用导出帧 |
 | 切换“运动监测 / 诊断与 CAN”、缩放曲线、查看记录 | 本地显示操作；ROS 订阅持续接收 | 无；不自动关闭 B7/B8、不重新查询版本 |
 | 只编辑速度、模式、蜂鸣器设置 | 修改待使用/待应用值；速度在方向仍按住时由下一次续期采用，模式/蜂鸣器需点击应用 | 没有独立编辑帧；持续运动和应用按钮行为见前文 |
 
-“清空图表”“重置本地位姿”“清运动计数”作用在三个不同位置。清运动计数才发送 `05 CC`；驱动在清计数时重建里程基线但保留已有 ROS 位姿，GUI 历史也不会因此自动清空。重置位姿本身同样不清 GUI 轨迹历史；需要清除旧轨迹时另点“清空图表”。
+“仅清空轨迹”“里程计清零”“设备计数清零”作用在不同位置。设备计数清零才发送 `05 CC`；驱动在清计数时重建里程基线但保留已有 ROS 位姿，GUI 历史也不会因此自动清空。里程计清零成功后自动清除旧路径，避免清零前后坐标被连在一起；速度/指令历史保留。“清空图表”仍会清除全部速度、指令与轨迹历史，不改变最新反馈和设备状态。
 
 ## 7. 关闭窗口时的安排
 
@@ -206,7 +208,7 @@ GUI 工作线程退出前会尝试发布零速并短暂处理通信，实际零�
 
 ## 8. 代码与证据入口
 
-- [window.py](../src/vehicle_gui/vehicle_gui/window.py)：`_controls`、`_diagnostic_page` 定义按钮；`_renew_motion`、`_command`、`stop_controls`、`export_csv`、`closeEvent` 定义输入和停止行为。
+- [window.py](../src/vehicle_gui/vehicle_gui/window.py)：`_controls`、`_motion_page` 定义按钮；`_renew_motion`、`_command`、`_reset_odometry`、`stop_controls`、`export_csv`、`closeEvent` 定义输入和停止行为。
 - [model.py](../src/vehicle_gui/vehicle_gui/model.py)：`MotionLease` 的 200 ms 有效期和一次零速；[ros_worker.py](../src/vehicle_gui/vehicle_gui/ros_worker.py) 负责 ROS 发布周期、异步服务和退出。
 - [vehicle_node.cpp](../src/vehicle_driver/src/vehicle_node.cpp)：`initialize_after_heartbeat`、`command_request`、`check_pending`、`control_tick` 和析构函数决定实际 CAN 发送安排。
 - [control.hpp](../src/vehicle_core/include/vehicle_core/control.hpp)、[protocol.cpp](../src/vehicle_core/src/protocol.cpp)、[socketcan.cpp](../src/vehicle_core/src/socketcan.cpp)：最新速度缓存、字节编码和实际 socket 写入。

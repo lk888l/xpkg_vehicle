@@ -23,6 +23,7 @@ class VehicleRosNode(Node):
     def __init__(self, store, context):
         super().__init__("vehicle_gui", context=context)
         self.store = store
+        self.odom_after_reset = None
         driver = self.declare_parameter("driver_name", "vehicle").value.rstrip("/")
         self.stamped = self.declare_parameter("use_stamped_cmd_vel", True).value
         self.topic = lambda name: f"{driver}/{name}"
@@ -77,10 +78,20 @@ class VehicleRosNode(Node):
             })
 
     def on_odom(self, message):
+        stamp = message.header.stamp.sec * 1_000_000_000 + message.header.stamp.nanosec
+        if self.odom_after_reset is not None:
+            if stamp <= self.odom_after_reset:
+                return
+            self.odom_after_reset = None
         p, q = message.pose.pose.position, message.pose.pose.orientation
         yaw = math.atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y * q.y + q.z * q.z))
         self.store.update("odom", {"x": p.x, "y": p.y, "yaw": yaw,
                                   "frame": message.header.frame_id, "child": message.child_frame_id})
+
+    def clear_odometry_display(self):
+        # Queued pre-reset DDS samples must not reconnect the old path to the origin.
+        self.odom_after_reset = self.get_clock().now().nanoseconds
+        self.store.clear_trajectory(clear_pose=True)
 
     def on_diagnostics(self, message):
         expected = self.resolve_topic_name(self.topic("socketcan"))
@@ -158,6 +169,8 @@ class RosWorker(QThread):
                                 raise TimeoutError("等待服务响应超时，请查看设备状态")
                             response = future.result()
                             if request["kind"] == "reset_odometry":
+                                if response.success:
+                                    node.clear_odometry_display()
                                 result.update(sent=True, state_confirmed=response.success,
                                               message=response.message)
                             else:

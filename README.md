@@ -57,6 +57,8 @@ ros2 component load /ComponentManager vehicle_driver vehicle_driver::VehicleNode
 
 ## ROS 接口
 
+完整架构、通讯规则及消息 / 服务字段见 [ROS 2 工程架构、通讯接口与数据结构](docs/ros2-interfaces.md)。
+
 默认节点 `/vehicle`；所有名称均可 namespace/remap。速度使用 SI 单位。
 
 | 接口 | 类型 | 说明 / QoS |

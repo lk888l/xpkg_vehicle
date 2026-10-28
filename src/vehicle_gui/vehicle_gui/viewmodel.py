@@ -29,6 +29,7 @@ class VehicleViewModel(QObject):
         self._submit("command", command, **fields)
 
     def reset_odometry(self):
+        self.lease.stop()
         self._submit("reset_odometry")
 
     def _submit(self, kind, command=0, **fields):

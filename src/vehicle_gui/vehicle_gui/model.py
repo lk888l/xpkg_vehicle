@@ -59,6 +59,12 @@ class TelemetryStore:
             for values in self._history.values():
                 values.clear()
 
+    def clear_trajectory(self, *, clear_pose=False):
+        with self._lock:
+            self._history["odom"].clear()
+            if clear_pose:
+                self._latest.pop("odom", None)
+
 
 def connection_state(sample, now=None):
     if sample is None:
@@ -108,7 +114,7 @@ class MotionLease:
             return None
 
 
-COMMAND_NAMES = {2: "查询版本", 3: "设置使能", 4: "清故障", 5: "清运动计数",
+COMMAND_NAMES = {2: "查询版本", 3: "设置使能", 4: "清故障", 5: "设备计数清零",
                  17: "设置模式 / 蜂鸣器", 21: "遥控反馈", 22: "传感反馈",
                  23: "驱动运动反馈", 24: "驱动状态反馈"}
 
@@ -118,7 +124,9 @@ def describe_result(result):
         return "error", result.get("message", "命令未发送")
     command = result.get("command")
     if result.get("kind") == "reset_odometry":
-        return ("info" if result.get("state_confirmed") else "warning"), result["message"]
+        if result.get("state_confirmed"):
+            return "info", "本地里程计已清零，旧轨迹已清空；设备里程与脉冲保持不变"
+        return "warning", result.get("message", "里程计清零尚未确认")
     if command in (4, 5) and result.get("acknowledged"):
         return "info", "已收到接收确认；实际效果请查看故障状态或里程 / 脉冲反馈"
     if command == 17 and result.get("state_confirmed"):

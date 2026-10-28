@@ -133,24 +133,14 @@ class MainWindow(QMainWindow):
         body = QSplitter(Qt.Horizontal)
         body.setChildrenCollapsible(False)
         controls = self._controls()
-        controls.setMinimumHeight(controls.minimumSizeHint().height())
-        control_scroll = QScrollArea()
-        control_scroll.setWidgetResizable(True)
-        control_scroll.setFrameShape(QFrame.NoFrame)
-        control_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        control_scroll = self._scroll_page(controls)
         control_scroll.setMinimumWidth(305)
         control_scroll.setMaximumWidth(385)
-        control_scroll.setWidget(controls)
         body.addWidget(control_scroll)
         self.tabs = QTabWidget()
-        motion_page = self._motion_page()
-        motion_page.setMinimumHeight(motion_page.minimumSizeHint().height())
-        motion_scroll = QScrollArea()
-        motion_scroll.setWidgetResizable(True)
-        motion_scroll.setFrameShape(QFrame.NoFrame)
-        motion_scroll.setWidget(motion_page)
-        self.tabs.addTab(motion_scroll, "运动监测")
-        self.tabs.addTab(self._diagnostic_page(), "诊断与 CAN")
+        self.motion_scroll = self._scroll_page(self._motion_page())
+        self.tabs.addTab(self.motion_scroll, "运动监测")
+        self.tabs.addTab(self._scroll_page(self._diagnostic_page()), "诊断与 CAN")
         body.addWidget(self.tabs)
         body.setSizes([310, 1040])
         layout.addWidget(body, 1)
@@ -167,6 +157,16 @@ class MainWindow(QMainWindow):
         self.render_timer.timeout.connect(self.refresh)
         self.render_timer.start(50)
         QTimer.singleShot(0, self.setFocus)
+
+    @staticmethod
+    def _scroll_page(page):
+        page.setMinimumHeight(page.minimumSizeHint().height())
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setWidget(page)
+        return scroll
 
     def _button(self, text, callback, name=None, service=True):
         button = QPushButton(text)
@@ -237,6 +237,22 @@ class MainWindow(QMainWindow):
         layout.addWidget(self._button("应用模式与蜂鸣器", self._apply_mode))
         self.version_label = label("硬件 —   /   软件 —")
         layout.addWidget(self.version_label)
+        layout.addSpacing(4)
+        layout.addWidget(label("里程计与维护", "section"))
+        operations = QGridLayout()
+        self.reset_odometry_button = self._button("里程计清零", self._reset_odometry)
+        self.reset_odometry_button.setToolTip("停止手动运动，将 ROS 的 X / Y / 航向清零，成功后清空旧轨迹")
+        self.zero_motion_button = self._button("设备计数清零", lambda: self._command(5))
+        self.zero_motion_button.setToolTip("停止手动运动，清零设备累计里程和驱动脉冲；保留 ROS 位姿与轨迹")
+        self.clear_faults_button = self._button("清故障", lambda: self._command(4))
+        self.version_button = self._button("查询版本", lambda: self._command(2))
+        for button, y, x in ((self.reset_odometry_button, 0, 0), (self.zero_motion_button, 0, 1),
+                             (self.clear_faults_button, 1, 0), (self.version_button, 1, 1)):
+            operations.addWidget(button, y, x)
+        layout.addLayout(operations)
+        reset_note = label("里程计清零：本地位姿与轨迹\n设备计数清零：设备里程与脉冲")
+        reset_note.setWordWrap(True)
+        layout.addWidget(reset_note)
         layout.addSpacing(3)
         self.result_title = label("命令结果", "section")
         layout.addWidget(self.result_title)
@@ -268,6 +284,36 @@ class MainWindow(QMainWindow):
         page.setObjectName("page")
         layout = QVBoxLayout(page)
         layout.setContentsMargins(15, 10, 15, 10)
+        layout.setSpacing(12)
+        trajectory_toolbar = QHBoxLayout()
+        trajectory_toolbar.addWidget(label("里程计与路径轨迹", "section"))
+        trajectory_toolbar.addStretch()
+        self.clear_trajectory_button = self._button("仅清空轨迹", self._clear_trajectory, service=False)
+        self.clear_trajectory_button.setToolTip("只清除已绘制的路径，保留当前位姿、设备计数和速度曲线")
+        trajectory_toolbar.addWidget(self.clear_trajectory_button)
+        self.fit_trajectory_button = self._button("显示完整轨迹", self._fit_trajectory, service=False)
+        trajectory_toolbar.addWidget(self.fit_trajectory_button)
+        layout.addLayout(trajectory_toolbar)
+        self.pose_label = label("X —    Y —    航向 —    ·    等待里程计反馈")
+        self.pose_label.setStyleSheet("color:#304a69;font-size:14px")
+        self.pose_label.setWordWrap(True)
+        layout.addWidget(self.pose_label)
+        self.trajectory = pg.PlotWidget(background="w")
+        self.trajectory.setAspectLocked(True)
+        self.trajectory.setLabel("bottom", "X", units="m")
+        self.trajectory.setLabel("left", "Y", units="m")
+        self.trajectory.showGrid(x=True, y=True, alpha=0.13)
+        self.trajectory.setMenuEnabled(False)
+        self.trajectory.setMinimumHeight(560)
+        self.path_curve = self.trajectory.plot(pen=pg.mkPen("#2464d7", width=2))
+        self.heading = self.trajectory.plot(pen=pg.mkPen("#e8a137", width=3))
+        self.position = self.trajectory.plot(pen=None, symbol="o", symbolSize=9, symbolBrush="#e8a137", symbolPen=None)
+        layout.addWidget(self.trajectory, 1)
+        note = label("轨迹内滚轮缩放 · 拖动平移 · 图外滚轮或右侧滚动条滚动页面\n"
+                     "轨迹由设备反馈积分计算；低速抖动请结合原始曲线判断。")
+        note.setWordWrap(True)
+        layout.addWidget(note)
+        layout.addSpacing(8)
         toolbar = QHBoxLayout()
         toolbar.addWidget(label("实时反馈 · 最近 30 秒", "section"))
         toolbar.addStretch()
@@ -281,7 +327,7 @@ class MainWindow(QMainWindow):
         self.wplot.setFixedHeight(225)
         graphs.addWidget(self.vplot)
         graphs.addWidget(self.wplot)
-        layout.addLayout(graphs, 4)
+        layout.addLayout(graphs)
         self.mileage_label = label("主轮里程  左 — / 右 —")
         layout.addWidget(self.mileage_label)
         layout.addWidget(label("四路驱动反馈", "section"))
@@ -289,28 +335,6 @@ class MainWindow(QMainWindow):
         self.drivers.setMinimumHeight(155)
         self.drivers.setMaximumHeight(190)
         layout.addWidget(self.drivers)
-        lower = QHBoxLayout()
-        self.trajectory = pg.PlotWidget(background="w")
-        self.trajectory.setAspectLocked(True)
-        self.trajectory.setLabel("bottom", "X", units="m")
-        self.trajectory.setLabel("left", "Y", units="m")
-        self.trajectory.showGrid(x=True, y=True, alpha=0.13)
-        self.trajectory.setFixedHeight(175)
-        self.path_curve = self.trajectory.plot(pen=pg.mkPen("#2464d7", width=2))
-        self.heading = self.trajectory.plot(pen=pg.mkPen("#e8a137", width=3))
-        self.position = self.trajectory.plot(pen=None, symbol="o", symbolSize=7, symbolBrush="#e8a137", symbolPen=None)
-        lower.addWidget(self.trajectory, 3)
-        details = QVBoxLayout()
-        details.addWidget(label("里程计轨迹", "section"))
-        self.pose_label = label("X —\nY —\n航向 —\n坐标系 —")
-        self.pose_label.setStyleSheet("color:#304a69;line-height:1.6")
-        details.addWidget(self.pose_label)
-        note = label("里程计由设备反馈计算\n低速抖动请结合原始曲线判断")
-        note.setWordWrap(True)
-        details.addWidget(note)
-        details.addStretch()
-        lower.addLayout(details, 2)
-        layout.addLayout(lower, 3)
         return page
 
     def _table(self, headers, rows=0):
@@ -331,18 +355,12 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(16, 14, 16, 14)
         self.health_label = label("等待诊断数据", "section")
         layout.addWidget(self.health_label)
-        operations = QHBoxLayout()
-        self.version_button = self._button("查询版本", lambda: self._command(2))
-        operations.addWidget(self.version_button)
-        operations.addWidget(self._button("清故障", lambda: self._command(4)))
-        operations.addWidget(self._button("清运动计数", lambda: self._command(5)))
-        operations.addWidget(self._button("重置本地位姿", self.model.reset_odometry))
-        layout.addLayout(operations)
         self.diagnostics = self._table(["诊断项", "值"])
-        self.diagnostics.setMaximumHeight(180)
+        self.diagnostics.setFixedHeight(180)
         layout.addWidget(self.diagnostics)
         layout.addWidget(label("整车 CAN 接收帧", "section"))
         self.raw_frames = self._table(["CAN ID", "长度", "数据", "累计帧数", "距上次"])
+        self.raw_frames.setMinimumHeight(300)
         self.raw_frames.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
         layout.addWidget(self.raw_frames, 1)
         self.unknowns = label("刹车 / 特殊功能：未知   ·   B1 D5：—   ·   故障帧：尚未收到")
@@ -352,7 +370,7 @@ class MainWindow(QMainWindow):
         self.log = QPlainTextEdit()
         self.log.setReadOnly(True)
         self.log.document().setMaximumBlockCount(200)
-        self.log.setMaximumHeight(150)
+        self.log.setFixedHeight(150)
         layout.addWidget(self.log)
         return page
 
@@ -397,7 +415,26 @@ class MainWindow(QMainWindow):
     def _apply_mode(self):
         self._command(17, mode=self.mode.currentData(), beep=self.beep.isChecked())
 
+    def _reset_odometry(self):
+        self.stop_controls()
+        self.model.reset_odometry()
+
+    def _clear_trajectory(self):
+        self.model.store.clear_trajectory()
+        self.model.store.event("已清空显示轨迹；当前位姿与设备计数保留")
+        self.refresh()
+        self._fit_trajectory()
+
+    def _fit_trajectory(self):
+        self.trajectory.autoRange()
+        self.trajectory.enableAutoRange()
+
     def eventFilter(self, watched, event):
+        if event.type() == QEvent.Wheel and not event.modifiers() & Qt.ControlModifier:
+            if watched in (self.vplot.viewport(), self.wplot.viewport()):
+                # Speed plots scroll the page; the trajectory keeps native wheel zoom.
+                QApplication.sendEvent(self.motion_scroll.viewport(), event)
+                return True
         if event.type() == QEvent.ApplicationDeactivate or (watched is self and event.type() == QEvent.WindowDeactivate):
             self.stop_controls()
         if event.type() in (QEvent.KeyPress, QEvent.KeyRelease):
@@ -431,6 +468,9 @@ class MainWindow(QMainWindow):
         self.result_flags.setText(f"发送 {flag('sent')}   应答 {flag('acknowledged') if ack_expected else '不适用'}   状态 {flag('state_confirmed')}")
         self.result_detail.setText(text)
         self.result_detail.setToolTip(result.get("message", ""))
+        if result.get("kind") == "reset_odometry" and result.get("state_confirmed"):
+            self.refresh()
+            self._fit_trajectory()
 
     @staticmethod
     def _cell(table, row, column, text, stale=False):
@@ -477,11 +517,16 @@ class MainWindow(QMainWindow):
             pose = latest.get("odom")
             if pose:
                 p = pose.value
-                self.pose_label.setText(f"X   {p['x']:+.3f} m\nY   {p['y']:+.3f} m\n航向   {math.degrees(p['yaw']):+.1f}°\n{p['frame']} → {p['child']}" +
-                                       ("\n反馈过期" if not pose.fresh(0.3, now) else ""))
+                self.pose_label.setText(f"X  {p['x']:+.3f} m    Y  {p['y']:+.3f} m    航向  {math.degrees(p['yaw']):+.1f}°"
+                                       f"    ·    {p['frame']} → {p['child']}" +
+                                       ("    ·    反馈过期" if not pose.fresh(0.3, now) else ""))
                 self.position.setData([p['x']], [p['y']])
                 self.heading.setData([p['x'], p['x'] + 0.08 * math.cos(p['yaw'])],
                                      [p['y'], p['y'] + 0.08 * math.sin(p['yaw'])])
+            else:
+                self.pose_label.setText("X —    Y —    航向 —    ·    等待里程计反馈")
+                self.position.setData([], [])
+                self.heading.setData([], [])
         if now - self._last_tables > 0.25:
             self._last_tables = now
             self._update_tables(latest, frames, now)

@@ -160,3 +160,71 @@ def test_closing_window_joins_worker_and_sends_stop(console):
     assert not model.worker.isRunning()
     time.sleep(0.08)
     assert motion_commands(emulator)[-1][1] == (0, 0, 0)
+
+
+def move_odometry(model, emulator):
+    # Feed measured motion into the real driver; the emulator otherwise reports zero.
+    for _ in range(12):
+        emulator.send(0xB2, struct.pack("<hhh", 500, 0, 200))
+        QTest.qWait(15)
+    wait_for(lambda: model.store.snapshot()[0].get("odom") is not None and
+             model.store.snapshot()[0]["odom"].value["x"] > 0.005)
+    QTest.qWait(100)
+
+
+def test_odometry_reset_stops_held_motion_and_starts_a_new_path(console):
+    window, model, emulator, _ = console
+    move_odometry(model, emulator)
+    before = model.store.snapshot()
+    window.setFocus()
+    QTest.keyPress(window, Qt.Key_W)
+    wait_for(lambda: motion_commands(emulator)[-1][1] == (100, 0, 0))
+    command_count = len(emulator.commands)
+    QTest.mouseClick(window.reset_odometry_button, Qt.LeftButton)
+    assert not window._held
+    wait_for(lambda: model.last_result is not None and model.last_result.get("kind") == "reset_odometry")
+    assert model.last_result["state_confirmed"]
+    wait_for(lambda: "odom" in model.store.snapshot()[0])
+    wait_for(lambda: motion_commands(emulator)[-1][1] == (0, 0, 0))
+    QTest.qWait(250)
+    latest, history, _, _, _ = model.store.snapshot()
+    assert all(abs(latest["odom"].value[k]) < 1e-9 for k in ("x", "y", "yaw"))
+    assert all(abs(p["x"]) < 1e-9 and abs(p["y"]) < 1e-9 for _, p in history["odom"])
+    assert len(history["velocity"]) >= len(before[1]["velocity"])
+    assert latest["driver_motion_0"].value["pulses"] == -100
+    assert not any(code == 5 for _, code, _ in emulator.commands[command_count:])
+    assert not model.lease._active and not window._held
+    assert "旧轨迹已清空" in window.result_detail.text()
+    QTest.keyRelease(window, Qt.Key_W)
+
+
+@pytest.mark.parametrize("command, button_name", [(4, "clear_faults_button"), (5, "zero_motion_button")])
+def test_maintenance_buttons_send_their_can_command_without_resetting_pose(console, command, button_name):
+    window, model, emulator, _ = console
+    move_odometry(model, emulator)
+    old_pose = model.store.snapshot()[0]["odom"].value
+    command_count = len(emulator.commands)
+    QTest.mouseClick(getattr(window, button_name), Qt.LeftButton)
+    assert model.busy and all(not button.isEnabled() for button in window.service_buttons)
+    wait_for(lambda: model.last_result is not None and model.last_result.get("command") == command)
+    assert [(code, data) for _, code, data in emulator.commands[command_count:] if code == command] == [(command, b"\xCC")]
+    assert model.last_result["acknowledged"] and not model.last_result["state_confirmed"]
+    assert model.store.snapshot()[0]["odom"].value == old_pose
+    assert "实际效果" in window.result_detail.text()
+    assert not model.busy
+
+
+def test_unavailable_reset_service_preserves_pose_and_path(console):
+    window, model, emulator, driver = console
+    move_odometry(model, emulator)
+    driver.send_signal(signal.SIGINT)
+    driver.wait(timeout=5)
+    QTest.qWait(300)
+    latest, history, _, _, _ = model.store.snapshot()
+    QTest.mouseClick(window.reset_odometry_button, Qt.LeftButton)
+    wait_for(lambda: model.last_result is not None and model.last_result.get("kind") == "reset_odometry")
+    assert not model.last_result.get("state_confirmed")
+    after, after_history, _, _, _ = model.store.snapshot()
+    assert after["odom"] == latest["odom"]
+    assert after_history["odom"] == history["odom"]
+    assert not model.busy

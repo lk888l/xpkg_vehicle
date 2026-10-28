@@ -54,3 +54,25 @@ def test_ack_is_not_misrepresented_as_physical_confirmation():
     assert describe_result(enable)[0] == "warning"
     mode = dict(clear, command=17, state_confirmed=True)
     assert "刹车" in describe_result(mode)[1] and "未知" in describe_result(mode)[1]
+
+
+def test_clearing_trajectory_preserves_pose_counters_and_speed_history():
+    store = TelemetryStore()
+    store.update("odom", {"x": 3.0, "y": 2.0, "yaw": 0.5})
+    store.update("mileage", {"left": 2000, "right": 2200})
+    store.update("velocity", {"vx": 0.1, "wz": 0.0})
+    store.update("command", {"vx": 0.0, "wz": 0.0})
+    before, history_before, _, _, _ = store.snapshot()
+    store.clear_trajectory()
+    latest, history, _, _, _ = store.snapshot()
+    assert latest == before
+    assert not history["odom"]
+    assert history["velocity"] == history_before["velocity"]
+    assert history["command"] == history_before["command"]
+
+    store.update("odom", {"x": 3.1, "y": 2.0, "yaw": 0.5})
+    store.clear_trajectory(clear_pose=True)
+    latest, history, _, _, _ = store.snapshot()
+    assert "odom" not in latest and not history["odom"]
+    assert latest["mileage"] == before["mileage"]
+    assert history["velocity"] == history_before["velocity"]
