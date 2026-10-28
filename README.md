@@ -5,7 +5,7 @@
 - 工作目录：`/home/kk/kk_data/ros2_project/vehicle_socketcan`
 - Git 分支：`refactor/socketcan-jazzy`，由 `main@f90f687` 创建 worktree。
 - 旧工程仍在 `../xpkg_vehicle` 的 `main` 分支。
-- 图形控制台：[PyQt5 使用说明](docs/gui.md)，通过 ROS 2 操作及显示底盘。
+- 图形控制台：[PyQt5 使用说明](docs/gui.md)、[GUI 功能与 CAN 帧对照](docs/gui-can.md)，通过 ROS 2 操作及显示底盘。
 - 实机结果：[验收报告](docs/validation.md)、[原始统计](artifacts/hardware_acceptance_2026-10-27.json)。低速精度尚未通过验收。
 
 ## 构建与启动
