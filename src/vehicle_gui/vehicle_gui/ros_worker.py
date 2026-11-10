@@ -12,11 +12,13 @@ from rclpy.node import Node
 from rclpy.qos import QoSProfile, DurabilityPolicy, ReliabilityPolicy, qos_profile_sensor_data
 from geometry_msgs.msg import Twist, TwistStamped
 from nav_msgs.msg import Odometry
+from sensor_msgs.msg import Imu
 from diagnostic_msgs.msg import DiagnosticArray
 from std_srvs.srv import Trigger
+from std_msgs.msg import UInt64
 from vehicle_interfaces.msg import (Acknowledgement, CanFrame, DriverMotion, DriverStatus,
-                                    Faults, State, Version, WheelMileage)
-from vehicle_interfaces.srv import Command
+                                    Faults, Heading, ImuCalibration, ImuStatus, MotionStatus, State, Version, WheelMileage)
+from vehicle_interfaces.srv import Command, ExecuteMotion
 
 
 class VehicleRosNode(Node):
@@ -24,6 +26,7 @@ class VehicleRosNode(Node):
         super().__init__("vehicle_gui", context=context)
         self.store = store
         self.odom_after_reset = None
+        self.heading_after_reset = None
         driver = self.declare_parameter("driver_name", "vehicle").value.rstrip("/")
         self.stamped = self.declare_parameter("use_stamped_cmd_vel", True).value
         self.topic = lambda name: f"{driver}/{name}"
@@ -39,6 +42,12 @@ class VehicleRosNode(Node):
         self.create_subscription(DriverMotion, self.topic("driver_motion"), self.on_driver_motion, qos_profile_sensor_data)
         self.create_subscription(DriverStatus, self.topic("driver_status"), self.on_driver_status, qos_profile_sensor_data)
         self.create_subscription(Odometry, "odom", self.on_odom, 10)
+        self.create_subscription(Heading, self.topic("heading"), self.on_heading, 10)
+        self.create_subscription(ImuCalibration, self.topic("imu_calibration"), self.on_calibration, durable)
+        self.create_subscription(MotionStatus, self.topic("motion_status"), self.on_motion_status, durable)
+        self.keepalive_publisher = self.create_publisher(UInt64, self.topic("motion_keepalive"), 1)
+        self.create_subscription(Imu, "imu/data", self.on_imu, qos_profile_sensor_data)
+        self.create_subscription(ImuStatus, "imu/status", self.on_imu_status, 10)
         self.create_subscription(DiagnosticArray, "diagnostics", self.on_diagnostics, 10)
         self.create_subscription(Acknowledgement, self.topic("acknowledgements"),
                                  lambda m: store.event(f"设备 ACK · 0x{m.command:02X}"), 10)
@@ -46,6 +55,21 @@ class VehicleRosNode(Node):
         self.create_subscription(Faults, self.topic("faults"), self.on_faults, 10)
         self.command_client = self.create_client(Command, self.topic("command"))
         self.reset_client = self.create_client(Trigger, self.topic("reset_odometry"))
+        self.calibration_client = self.create_client(Trigger, self.topic("calibrate_imu"))
+        self.zero_imu_client = self.create_client(Trigger, "imu/zero_orientation")
+        self.execute_client = self.create_client(ExecuteMotion, self.topic("execute_motion"))
+
+    def on_motion_status(self, message):
+        previous = self.store.latest("motion_status")
+        self.store.update("motion_status", {key: getattr(message, key) for key in
+            ("goal_id", "state", "mode", "active", "target", "progress", "remaining", "target_yaw",
+             "heading_error", "command_linear_speed", "command_yaw_rate", "feedforward_gain", "message")})
+        if message.active or (previous and previous.value["active"]):
+            self.store.update("command", {"vx": message.command_linear_speed, "wz": message.command_yaw_rate})
+        if message.goal_id and (previous is None or previous.value["state"] != message.state or
+                               previous.value["goal_id"] != message.goal_id):
+            self.store.event("自动运动 · " + message.message,
+                             "warning" if message.state == MotionStatus.FAILED else "info")
 
     def on_state(self, message):
         now = self.get_clock().now().nanoseconds / 1e9
@@ -86,11 +110,53 @@ class VehicleRosNode(Node):
         p, q = message.pose.pose.position, message.pose.pose.orientation
         yaw = math.atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y * q.y + q.z * q.z))
         self.store.update("odom", {"x": p.x, "y": p.y, "yaw": yaw,
+                                  "ros_stamp_ns": stamp, "vx": message.twist.twist.linear.x,
+                                  "wz": message.twist.twist.angular.z,
                                   "frame": message.header.frame_id, "child": message.child_frame_id})
+
+    def on_heading(self, message):
+        stamp = message.header.stamp.sec * 1_000_000_000 + message.header.stamp.nanosec
+        if self.heading_after_reset is not None:
+            if stamp <= self.heading_after_reset:
+                return
+            self.heading_after_reset = None
+        self.store.update("heading", {"yaw": message.yaw, "wz": message.yaw_rate,
+                                      "ros_stamp_ns": stamp,
+                                      "imu_active": message.imu_active, "imu_age": message.imu_age})
+
+    def on_imu(self, message):
+        if message.orientation_covariance[0] < 0:
+            self.store.update("imu", {"valid": False})
+            return
+        q = message.orientation
+        self.store.update("imu", {
+            "valid": True,
+            "roll": math.atan2(2*(q.w*q.x+q.y*q.z), 1-2*(q.x*q.x+q.y*q.y)),
+            "pitch": math.asin(max(-1.0, min(1.0, 2*(q.w*q.y-q.z*q.x)))),
+            "yaw": math.atan2(2*(q.w*q.z+q.x*q.y), 1-2*(q.y*q.y+q.z*q.z)),
+        })
+
+    def on_calibration(self, message):
+        previous = self.store.latest("imu_calibration")
+        self.store.update("imu_calibration", {key: getattr(message, key) for key in
+            ("state", "active", "calibrated", "yaw_sign", "positive_delta", "negative_delta",
+             "command_yaw_rate", "message")})
+        if message.active or (previous and previous.value["active"]):
+            self.store.update("command", {"vx": 0.0, "wz": message.command_yaw_rate})
+        if previous is None or previous.value["state"] != message.state:
+            self.store.event("IMU 标定 · " + message.message,
+                             "warning" if message.state == ImuCalibration.FAILED else "info")
+
+    def on_imu_status(self, message):
+        self.store.update("imu_status", {key: getattr(message, key) for key in
+            ("online", "measurement_valid", "orientation_valid", "nmt_state", "faults",
+             "sample_count", "quaternion_count", "measurement_age", "orientation_age",
+             "rx_frames", "malformed_frames", "error_frames", "dropped_frames", "message")})
 
     def clear_odometry_display(self):
         # Queued pre-reset DDS samples must not reconnect the old path to the origin.
         self.odom_after_reset = self.get_clock().now().nanoseconds
+        self.heading_after_reset = self.odom_after_reset
         self.store.clear_trajectory(clear_pose=True)
 
     def on_diagnostics(self, message):
@@ -144,6 +210,7 @@ class RosWorker(QThread):
         executor = None
         node = None
         pending = None
+        goal_lease = None
         try:
             rclpy.init(args=self.ros_args, context=context)
             node = VehicleRosNode(self.store, context)
@@ -157,6 +224,23 @@ class RosWorker(QThread):
                 if now >= next_send:
                     next_send = now + 0.05
                     values = self.lease.sample(now)
+                    if goal_lease is not None:
+                        goal_id, revision = goal_lease
+                        status = self.store.latest("motion_status")
+                        if not self.lease.is_current(revision) or (status and
+                                status.value["goal_id"] == goal_id and not status.value["active"]):
+                            goal_lease = None
+                        elif self.lease.fresh(revision, now):
+                            node.keepalive_publisher.publish(UInt64(data=goal_id))
+                        else:
+                            # One explicit stop also covers a worker that resumes after a freeze.
+                            values = values if values is not None else (0.0, 0.0)
+                            goal_lease = None
+                    if pending is not None and pending[1]["kind"] in ("calibrate_imu", "execute_motion") and \
+                            not self.lease.is_current(pending[1]["fields"]["motion_revision"]):
+                        # Keep a stop effective even if the service reaches the driver
+                        # after the operator's first stop. Fresh manual input takes over.
+                        values = values if values is not None else (0.0, 0.0)
                     if values is not None:
                         node.publish_motion(values)
                 if pending is not None:
@@ -168,17 +252,32 @@ class RosWorker(QThread):
                                 future.cancel()
                                 raise TimeoutError("等待服务响应超时，请查看设备状态")
                             response = future.result()
-                            if request["kind"] == "reset_odometry":
-                                if response.success:
+                            if request["kind"] in ("reset_odometry", "zero_imu"):
+                                if request["kind"] == "reset_odometry" and response.success:
                                     node.clear_odometry_display()
                                 result.update(sent=True, state_confirmed=response.success,
                                               message=response.message)
+                            elif request["kind"] == "calibrate_imu":
+                                result.update(sent=True, request_accepted=response.success,
+                                              message=response.message)
+                            elif request["kind"] == "execute_motion":
+                                result.update(sent=True, request_accepted=response.accepted,
+                                              goal_id=response.goal_id, message=response.message)
                             else:
                                 result.update({key: getattr(response, key) for key in
                                                ("sent", "acknowledged", "state_confirmed", "message",
                                                 "hardware_version", "software_version")})
                         except Exception as error:
                             result["message"] = str(error)
+                        if request["kind"] in ("calibrate_imu", "execute_motion"):
+                            revision = request["fields"]["motion_revision"]
+                            result["superseded"] = not self.lease.is_current(revision)
+                            if not result.get("request_accepted"):
+                                self.lease.stop(revision)
+                            if result["superseded"] or not result.get("request_accepted"):
+                                node.publish_motion(self.lease.sample(now) or (0.0, 0.0))
+                            elif request["kind"] == "execute_motion":
+                                goal_lease = (result["goal_id"], revision)
                         self.outcome.emit(result)
                         pending = None
                 try:
@@ -188,12 +287,28 @@ class RosWorker(QThread):
                 if pending is not None:
                     self.outcome.emit(dict(request, sent=False, message="上一条命令仍在等待设备反馈"))
                     continue
-                client = node.reset_client if request["kind"] == "reset_odometry" else node.command_client
-                if not client.service_is_ready():
-                    self.outcome.emit(dict(request, sent=False, message="底盘服务未连接，请先启动驱动"))
+                calibrating = request["kind"] in ("calibrate_imu", "execute_motion")
+                if calibrating and not self.lease.is_current(request["fields"]["motion_revision"]):
+                    self.outcome.emit(dict(request, sent=False, superseded=True,
+                                           message="运动请求已被停止或手动控制取消，未发送"))
                     continue
-                payload = Trigger.Request() if request["kind"] == "reset_odometry" else Command.Request(
-                    command=request["command"], **request["fields"])
+                client = {"reset_odometry": node.reset_client, "calibrate_imu": node.calibration_client,
+                          "zero_imu": node.zero_imu_client, "execute_motion": node.execute_client}.get(
+                    request["kind"], node.command_client)
+                if not client.service_is_ready():
+                    if calibrating:
+                        self.lease.stop(request["fields"]["motion_revision"])
+                    message = "IMU 服务未连接，请先启动 IMU 节点" if request["kind"] == "zero_imu" else \
+                              "底盘服务未连接，请先启动驱动"
+                    self.outcome.emit(dict(request, sent=False, message=message))
+                    continue
+                if request["kind"] == "execute_motion":
+                    payload = ExecuteMotion.Request(**{key: value for key, value in request["fields"].items()
+                                                       if key != "motion_revision"})
+                elif request["kind"] == "command":
+                    payload = Command.Request(command=request["command"], **request["fields"])
+                else:
+                    payload = Trigger.Request()
                 pending = (client.call_async(payload), request, now + 3.0)
         except Exception as error:
             self.failed.emit(str(error))

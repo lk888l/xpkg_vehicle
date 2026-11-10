@@ -72,7 +72,8 @@ class Acceptance:
         component = prefix / "lib/libvehicle_component.so"
         self.report["driver_binary_sha256"] = hashlib.sha256(component.read_bytes()).hexdigest()
         self.log = args.output.with_suffix(".log").open("w")
-        self.process = subprocess.Popen([str(executable), "--ros-args", "-p", f"can_interface:={args.interface}"],
+        self.process = subprocess.Popen([str(executable), "--ros-args", "-p", f"can_interface:={args.interface}",
+                                         "-p", "auto_imu_calibration:=false"],
                                         stdout=self.log, stderr=subprocess.STDOUT)
 
     def set_state(self, message):

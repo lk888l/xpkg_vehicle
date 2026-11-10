@@ -12,28 +12,37 @@
 #include <optional>
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_components/register_node_macro.hpp>
+#include <sensor_msgs/msg/imu.hpp>
 #include <std_srvs/srv/trigger.hpp>
+#include <std_msgs/msg/u_int64.hpp>
 #include <stdexcept>
 #include <string>
 #include <vehicle_core/control.hpp>
+#include <vehicle_core/motion_controller.hpp>
 #include <vehicle_core/odometry.hpp>
 #include <vehicle_core/transport.hpp>
+#include <vehicle_core/yaw_calibration.hpp>
 #include <vehicle_interfaces/msg/acknowledgement.hpp>
 #include <vehicle_interfaces/msg/can_frame.hpp>
 #include <vehicle_interfaces/msg/driver_motion.hpp>
 #include <vehicle_interfaces/msg/driver_status.hpp>
 #include <vehicle_interfaces/msg/faults.hpp>
+#include <vehicle_interfaces/msg/heading.hpp>
+#include <vehicle_interfaces/msg/imu_calibration.hpp>
+#include <vehicle_interfaces/msg/motion_status.hpp>
 #include <vehicle_interfaces/msg/remote.hpp>
 #include <vehicle_interfaces/msg/sensors.hpp>
 #include <vehicle_interfaces/msg/state.hpp>
 #include <vehicle_interfaces/msg/version.hpp>
 #include <vehicle_interfaces/msg/wheel_mileage.hpp>
 #include <vehicle_interfaces/srv/command.hpp>
+#include <vehicle_interfaces/srv/execute_motion.hpp>
 
 namespace vehicle_driver {
 namespace core = vehicle_core;
 namespace msg = vehicle_interfaces::msg;
 using CommandService = vehicle_interfaces::srv::Command;
+using MotionService = vehicle_interfaces::srv::ExecuteMotion;
 using Service = rclcpp::Service<CommandService>;
 using Clock = std::chrono::steady_clock;
 static double monotonic() {
@@ -58,6 +67,18 @@ class VehicleNode final : public rclcpp::Node {
     command_timeout_ = positive("command_timeout", 0.30);
     commands_ = std::make_unique<core::CommandBuffer>(
         command_timeout_, positive("max_linear_speed", 1.0), positive("max_angular_speed", 2.0));
+    motion_config_.track_width = positive("motion_track_width", 0.535);
+    motion_config_.wheelbase = positive("motion_wheelbase", 0.420);
+    motion_config_.skid_compensation = parameter<double>("motion_skid_compensation", 0.5);
+    motion_config_.max_linear_speed = positive("motion_linear_speed", 0.1);
+    motion_config_.max_angular_speed = positive("motion_angular_speed", 0.2);
+    motion_config_.heading_gain = positive("motion_heading_gain", 1.8);
+    motion_config_.yaw_rate_gain = parameter<double>("motion_yaw_rate_gain", 0.2);
+    motion_config_.angle_tolerance = positive("motion_angle_tolerance", motion_config_.angle_tolerance);
+    motion_config_.distance_gain = positive("motion_distance_gain", 0.8);
+    motion_config_.distance_tolerance = positive("motion_distance_tolerance", 0.01);
+    motion_config_.timeout = positive("motion_timeout", 120.0);
+    motion_config_.validate();
     service_timeout_ = positive("service_timeout", 1.2);
     heartbeat_timeout_ = positive("heartbeat_timeout", 1.5);
     remote_feedback_ = parameter<bool>("remote_feedback", false);
@@ -72,6 +93,20 @@ class VehicleNode final : public rclcpp::Node {
     if (wheel_odometry_ && (!std::isfinite(width) || width <= 0))
       throw std::invalid_argument("wheel_mileage requires calibrated effective_track_width > 0");
     odometry_ = std::make_unique<core::Odometry>(width);
+    use_imu_heading_ = parameter<bool>("use_imu_heading", true);
+    imu_yaw_sign_ = parameter<int>("imu_yaw_sign", 1);
+    if (imu_yaw_sign_ != 1 && imu_yaw_sign_ != -1)
+      throw std::invalid_argument("imu_yaw_sign must be +1 or -1");
+    core::YawCalibrationConfig calibration_config;
+    calibration_config.speed = std::min(positive("imu_calibration_speed", 0.30),
+                                        get_parameter("max_angular_speed").as_double());
+    calibration_config.angle = positive("imu_calibration_angle", calibration_config.angle);
+    calibration_config.min_angle = positive("imu_calibration_min_angle", calibration_config.min_angle);
+    calibration_config.settle_time = positive("imu_calibration_settle_time", 0.30);
+    calibration_config.phase_timeout = positive("imu_calibration_phase_timeout", 3.0);
+    calibration_ = std::make_unique<core::YawCalibration>(calibration_config);
+    auto_imu_calibration_ = parameter<bool>("auto_imu_calibration", true);
+    if (auto_imu_calibration_ && use_imu_heading_) calibration_->request();
     odom_frame_ = parameter<std::string>("odom_frame", "odom");
     base_frame_ = parameter<std::string>("base_frame", "base_link");
     if (odom_frame_.empty() || base_frame_.empty() || odom_frame_ == base_frame_)
@@ -95,10 +130,29 @@ class VehicleNode final : public rclcpp::Node {
     sensors_pub_ = create_publisher<msg::Sensors>("~/sensors", telemetry_qos);
     faults_pub_ = create_publisher<msg::Faults>("~/faults", rclcpp::QoS(10));
     odom_pub_ = create_publisher<nav_msgs::msg::Odometry>("odom", rclcpp::QoS(10));
+    heading_pub_ = create_publisher<msg::Heading>("~/heading", rclcpp::QoS(10));
+    calibration_pub_ = create_publisher<msg::ImuCalibration>("~/imu_calibration", rclcpp::QoS(1).transient_local());
+    motion_pub_ = create_publisher<msg::MotionStatus>("~/motion_status", rclcpp::QoS(1).transient_local());
+    motion_service_ = create_service<MotionService>("~/execute_motion",
+        [this](MotionService::Request::SharedPtr request, MotionService::Response::SharedPtr response) {
+          execute_motion(*request, *response);
+        });
+    keepalive_sub_ = create_subscription<std_msgs::msg::UInt64>("~/motion_keepalive", rclcpp::QoS(1),
+        [this](std_msgs::msg::UInt64::ConstSharedPtr m) {
+          if (m->data == motion_id_) motion_.keepalive(monotonic());
+        });
+    if (use_imu_heading_) {
+      imu_sub_ = create_subscription<sensor_msgs::msg::Imu>(
+          "imu/data", rclcpp::QoS(10), [this](sensor_msgs::msg::Imu::ConstSharedPtr m) {
+            receive_imu(*m);
+          });
+    }
     diagnostics_pub_ = create_publisher<diagnostic_msgs::msg::DiagnosticArray>("diagnostics", 10);
     if (stamped) {
       stamped_sub_ = create_subscription<geometry_msgs::msg::TwistStamped>(
           "cmd_vel", rclcpp::QoS(1), [this](geometry_msgs::msg::TwistStamped::ConstSharedPtr m) {
+            calibration_->cancel("Canceled by cmd_vel input");
+            motion_.cancel("速度命令已接管");
             try {
               if (m->header.stamp.sec != 0 || m->header.stamp.nanosec != 0) {
                 const double age =
@@ -129,15 +183,37 @@ class VehicleNode final : public rclcpp::Node {
     reset_odom_ = create_service<std_srvs::srv::Trigger>(
         "~/reset_odometry", [this](std_srvs::srv::Trigger::Request::SharedPtr,
                                    std_srvs::srv::Trigger::Response::SharedPtr response) {
+          calibration_->cancel("Canceled by odometry reset");
+          motion_.cancel("里程计重置，运动已取消");
+          commands_->stop();
+          transmit(core::motion(address_, 0, 0, 0));
           odometry_->reset();
           response->success = true;
           response->message = "Local odometry reset; device counters unchanged";
+        });
+    calibrate_imu_ = create_service<std_srvs::srv::Trigger>(
+        "~/calibrate_imu", [this](std_srvs::srv::Trigger::Request::SharedPtr,
+                                  std_srvs::srv::Trigger::Response::SharedPtr response) {
+          if (!use_imu_heading_ || calibration_->pending()) {
+            response->success = false;
+            response->message = !use_imu_heading_ ? "use_imu_heading is disabled" : "Calibration already pending or active";
+            return;
+          }
+          commands_->stop();
+          transmit(core::motion(address_, 0, 0, 0));
+          calibration_->request();
+          motion_.cancel("IMU 标定已接管");
+          response->success = true;
+          response->message = "Calibration requested; observe imu_calibration for the measured result";
+          publish_calibration();
         });
     connect();
     poll_timer_ = create_wall_timer(std::chrono::milliseconds(2), [this] { poll_can(); });
     control_timer_ =
         create_wall_timer(std::chrono::duration<double>(1.0 / rate), [this] { control_tick(); });
     health_timer_ = create_wall_timer(std::chrono::milliseconds(500), [this] { health_tick(); });
+    publish_calibration();
+    publish_motion_status(true);
     RCLCPP_INFO(get_logger(), "SocketCAN %s, vehicle ID 0x%08X, odometry=%s, cmd_vel=%s",
                 interface_.c_str(), address_.base(), odom_source.c_str(),
                 stamped ? "TwistStamped" : "Twist");
@@ -178,6 +254,8 @@ class VehicleNode final : public rclcpp::Node {
     return m;
   }
   void accept_command(const geometry_msgs::msg::Twist& twist) {
+    calibration_->cancel("Canceled by cmd_vel input");
+    motion_.cancel("速度命令已接管");
     if (!std::isfinite(twist.linear.y) || !std::isfinite(twist.linear.z) ||
         !std::isfinite(twist.angular.x) || !std::isfinite(twist.angular.y) ||
         !commands_->set(twist.linear.x, twist.angular.z, monotonic())) {
@@ -207,6 +285,8 @@ class VehicleNode final : public rclcpp::Node {
     transport_.reset();
     next_connect_ = monotonic() + 1.0;
     commands_->stop();
+    motion_.fail("底盘 CAN 断开，运动已停止");
+    if (calibration_->active()) calibration_->fail("Chassis CAN transport disconnected");
     odometry_->rebase();
     // Never replay a command cached before a transport failure.
     RCLCPP_ERROR_THROTTLE(get_logger(), *get_clock(), 2000, "%s", error.c_str());
@@ -268,14 +348,149 @@ class VehicleNode final : public rclcpp::Node {
   void control_tick() {
     const double tick = monotonic();
     if (heartbeat_time_ && tick - *heartbeat_time_ > heartbeat_timeout_) commands_->stop();
-    if (auto command = commands_->sample(tick))
+    const bool ready = transport_ && heartbeat_time_ && tick - *heartbeat_time_ < heartbeat_timeout_ &&
+        state_.enabled && status_time_ && tick - *status_time_ < 0.5 && state_.mode == 2 && state_.work_state == 0;
+    const auto previous = calibration_->state();
+    const auto calibration_command = calibration_->tick(tick, ready);
+    if (previous == core::YawCalibration::State::Waiting && calibration_->active()) {
+      commands_->stop();
+      odometry_->invalidate_heading();
+    }
+    if (previous != core::YawCalibration::State::Succeeded &&
+        calibration_->state() == core::YawCalibration::State::Succeeded) {
+      imu_yaw_sign_ = calibration_->sign();
+      imu_yaw_calibrated_ = true;
+      odometry_->invalidate_heading();
+      if (raw_imu_yaw_ && raw_imu_time_ && calibration_->fresh(tick))
+        odometry_->set_heading(imu_yaw_sign_ * *raw_imu_yaw_, *raw_imu_time_);
+    }
+    if (calibration_command) {
+      transmit(core::motion(address_, 0, 0, *calibration_command));
+    } else if (auto automatic = motion_.tick(odometry_->pose(), tick, motion_ready(tick))) {
+      transmit(core::motion(address_, automatic->vx, 0, automatic->yaw_rate));
+    } else if (auto command = commands_->sample(tick)) {
       transmit(core::motion(address_, command->vx, 0, command->yaw_rate));
+    }
+    publish_calibration();
+    publish_motion_status();
     if (startup_wait_ && tick > startup_deadline_) {
       startup_wait_ = false;
       initialize_ = false;
       RCLCPP_WARN(get_logger(),
                   "Startup enable not observed; inspect state and use command service");
     }
+  }
+  bool motion_ready(double tick) const {
+    return transport_ && heartbeat_time_ && tick - *heartbeat_time_ < heartbeat_timeout_ &&
+        state_.enabled && status_time_ && tick - *status_time_ < 0.5 && state_.mode == 2 &&
+        state_.work_state == 0 && odom_time_ && tick - *odom_time_ < 0.25 &&
+        odometry_->heading_fresh(tick) && !calibration_->pending();
+  }
+  void execute_motion(const MotionService::Request& request, MotionService::Response& response) {
+    response.goal_id = motion_id_;
+    if (request.mode == MotionService::Request::CANCEL) {
+      motion_.cancel("运动命令已取消");
+      calibration_->cancel("Canceled by motion stop");
+      commands_->stop();
+      transmit(core::motion(address_, 0, 0, 0));
+      response.accepted = true;
+      response.message = "已请求停止";
+      publish_motion_status(true);
+      return;
+    }
+    if (!motion_ready(monotonic())) {
+      response.message = "需要已使能的 CAN 模式、新鲜里程计与已就绪的 IMU 航向；标定期间不能执行";
+      return;
+    }
+    try {
+      auto config = motion_config_;
+      if (request.use_custom_config) {
+        config.track_width = request.track_width;
+        config.wheelbase = request.wheelbase;
+        config.skid_compensation = request.skid_compensation;
+        config.max_linear_speed = request.max_linear_speed;
+        config.max_angular_speed = request.max_angular_speed;
+        config.heading_gain = request.heading_gain;
+        config.yaw_rate_gain = request.yaw_rate_gain;
+        config.angle_tolerance = request.angle_tolerance;
+        config.distance_gain = request.distance_gain;
+        config.distance_tolerance = request.distance_tolerance;
+        config.timeout = request.timeout;
+      }
+      config.validate();
+      config.max_linear_speed = std::min(config.max_linear_speed, get_parameter("max_linear_speed").as_double());
+      config.max_angular_speed = std::min(config.max_angular_speed, get_parameter("max_angular_speed").as_double());
+      motion_.start(static_cast<core::MotionController::Mode>(request.mode), request.target,
+                    config, odometry_->pose(), monotonic(), request.client_timeout);
+      ++motion_id_;
+      commands_->stop();
+      // Consume the old manual stop now so it cannot replay after this goal.
+      commands_->sample(monotonic());
+      if (!transmit(core::motion(address_, 0, 0, 0))) {
+        motion_.fail("底盘停止指令发送失败");
+        response.message = motion_.message();
+      } else {
+        response.accepted = true;
+        response.message = "运动请求已受理，完成结果见 motion_status";
+      }
+      response.goal_id = motion_id_;
+      publish_motion_status(true);
+    } catch (const std::exception& error) {
+      response.message = error.what();
+    }
+  }
+  void publish_motion_status(bool force = false) {
+    const double tick = monotonic();
+    if (!force && last_motion_state_ == motion_.state() && tick - last_motion_publish_ < 0.1) return;
+    last_motion_publish_ = tick;
+    last_motion_state_ = motion_.state();
+    auto m = message<msg::MotionStatus>(now());
+    m.header.frame_id = odom_frame_;
+    m.goal_id = motion_id_;
+    m.state = static_cast<uint8_t>(motion_.state());
+    m.mode = static_cast<uint8_t>(motion_.mode());
+    m.active = motion_.active();
+    m.target = motion_.target(); m.progress = motion_.progress(); m.remaining = motion_.remaining();
+    m.target_yaw = motion_.target_yaw(); m.heading_error = motion_.heading_error();
+    m.command_linear_speed = motion_.command().vx; m.command_yaw_rate = motion_.command().yaw_rate;
+    m.feedforward_gain = motion_.config().feedforward_gain();
+    m.message = motion_.message();
+    motion_pub_->publish(m);
+  }
+  void receive_imu(const sensor_msgs::msg::Imu& m) {
+    const auto& q = m.orientation;
+    const double norm = q.w*q.w + q.x*q.x + q.y*q.y + q.z*q.z;
+    const double age = (now() - rclcpp::Time(m.header.stamp, get_clock()->get_clock_type())).seconds();
+    if (m.header.frame_id != base_frame_ || m.orientation_covariance[0] < 0 ||
+        !std::isfinite(norm) || norm < 0.98 || norm > 1.02 || age < -0.1 || age >= 0.25) {
+      calibration_->invalidate();
+      motion_.fail("IMU 姿态无效，运动已停止");
+      raw_imu_yaw_.reset(); raw_imu_time_.reset();
+      odometry_->invalidate_heading();
+      return;
+    }
+    const double time = monotonic() - std::max(0.0, age);
+    if (raw_imu_time_ && time <= *raw_imu_time_) return;
+    raw_imu_yaw_ = std::atan2(2*(q.w*q.z+q.x*q.y), 1-2*(q.y*q.y+q.z*q.z));
+    raw_imu_time_ = time;
+    calibration_->observe(*raw_imu_yaw_, time);
+    if (!calibration_->active() && (!auto_imu_calibration_ || imu_yaw_calibrated_))
+      odometry_->set_heading(imu_yaw_sign_ * *raw_imu_yaw_, time);
+  }
+  void publish_calibration() {
+    const double tick = monotonic();
+    const bool changed = !last_calibration_state_ || *last_calibration_state_ != calibration_->state();
+    if (!changed && tick - last_calibration_publish_ < 0.1) return;
+    last_calibration_publish_ = tick;
+    auto m = message<msg::ImuCalibration>(now());
+    m.state = static_cast<uint8_t>(calibration_->state());
+    m.active = calibration_->active(); m.calibrated = imu_yaw_calibrated_;
+    m.yaw_sign = static_cast<int8_t>(imu_yaw_sign_);
+    m.positive_delta = calibration_->positive_delta(); m.negative_delta = calibration_->negative_delta();
+    m.command_yaw_rate = calibration_->command(); m.message = calibration_->message();
+    calibration_pub_->publish(m);
+    if (changed) RCLCPP_INFO(get_logger(), "IMU calibration: %s", m.message.c_str());
+    last_calibration_state_ = calibration_->state();
   }
   void initialize_after_heartbeat(bool enabled) {
     if (!initialize_) return;
@@ -309,6 +524,7 @@ class VehicleNode final : public rclcpp::Node {
     state_pub_->publish(state_);
   }
   void receive(const core::Heartbeat& event, const rclcpp::Time& stamp, double tick) {
+    if (!event.enabled) motion_.fail("底盘失能，运动已停止");
     if (state_.heartbeat_received && state_.enabled && !event.enabled) commands_->stop();
     heartbeat_time_ = tick;
     state_.heartbeat_received = true;
@@ -321,6 +537,7 @@ class VehicleNode final : public rclcpp::Node {
     publish_state(stamp);
   }
   void receive(const core::Status& event, const rclcpp::Time& stamp, double tick) {
+    if (event.mode != 2 || event.work_state != 0) motion_.fail("底盘模式或工作状态改变，运动已停止");
     if (state_.status_received && state_.mode != event.mode) commands_->stop();
     status_time_ = tick;
     state_.status_received = true;
@@ -413,7 +630,14 @@ class VehicleNode final : public rclcpp::Node {
     faults_pub_->publish(m);
   }
   void publish_odometry(const rclcpp::Time& stamp) {
+    odom_time_ = monotonic();
     const auto& pose = odometry_->pose();
+    auto heading = message<msg::Heading>(stamp);
+    heading.header.frame_id = odom_frame_;
+    heading.yaw = pose.yaw; heading.yaw_rate = pose.yaw_rate;
+    heading.imu_active = odometry_->heading_fresh(monotonic());
+    heading.imu_age = odometry_->heading_age(monotonic());
+    heading_pub_->publish(heading);
     auto m = message<nav_msgs::msg::Odometry>(stamp);
     m.header.frame_id = odom_frame_;
     m.child_frame_id = base_frame_;
@@ -495,6 +719,8 @@ class VehicleNode final : public rclcpp::Node {
       if (command == core::Command::Reset || command == core::Command::Mode ||
           command == core::Command::ZeroMotion ||
           (command == core::Command::Enable && !request->enabled)) {
+        calibration_->cancel("Canceled by explicit chassis command");
+        motion_.cancel("底盘操作已取消运动");
         commands_->stop();
         transmit(core::motion(address_, 0, 0, 0));
       }
@@ -590,6 +816,11 @@ class VehicleNode final : public rclcpp::Node {
     value("rejected_commands", rejected_commands_);
     value("command_active", commands_->active(tick));
     value("odometry_discontinuities", odometry_->discontinuities());
+    value("imu_heading_active", odometry_->heading_fresh(tick));
+    value("imu_heading_age_s", odometry_->heading_age(tick));
+    value("imu_yaw_sign", imu_yaw_sign_);
+    value("imu_yaw_calibrated", imu_yaw_calibrated_);
+    value("imu_calibration_state", static_cast<int>(calibration_->state()));
     diagnostics.status.push_back(status);
     diagnostics_pub_->publish(diagnostics);
   }
@@ -604,7 +835,19 @@ class VehicleNode final : public rclcpp::Node {
       tx_errors_{}, rejected_commands_{};
   std::unique_ptr<core::CanTransport> transport_;
   std::unique_ptr<core::CommandBuffer> commands_;
+  core::MotionConfig motion_config_;
+  core::MotionController motion_;
+  uint64_t motion_id_{};
+  core::MotionController::State last_motion_state_{core::MotionController::State::Idle};
+  double last_motion_publish_{};
+  std::optional<double> odom_time_;
   std::unique_ptr<core::Odometry> odometry_;
+  std::unique_ptr<core::YawCalibration> calibration_;
+  bool use_imu_heading_{}, imu_yaw_calibrated_{}, auto_imu_calibration_{};
+  int imu_yaw_sign_{1};
+  std::optional<double> raw_imu_yaw_, raw_imu_time_;
+  std::optional<core::YawCalibration::State> last_calibration_state_;
+  double last_calibration_publish_{};
   std::unique_ptr<tf2_ros::TransformBroadcaster> tf_;
   std::optional<double> heartbeat_time_, status_time_, motion_time_;
   std::optional<Pending> pending_;
@@ -621,11 +864,18 @@ class VehicleNode final : public rclcpp::Node {
   rclcpp::Publisher<msg::Sensors>::SharedPtr sensors_pub_;
   rclcpp::Publisher<msg::Faults>::SharedPtr faults_pub_;
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
+  rclcpp::Publisher<msg::Heading>::SharedPtr heading_pub_;
+  rclcpp::Publisher<msg::ImuCalibration>::SharedPtr calibration_pub_;
+  rclcpp::Publisher<msg::MotionStatus>::SharedPtr motion_pub_;
   rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticArray>::SharedPtr diagnostics_pub_;
   rclcpp::Subscription<geometry_msgs::msg::TwistStamped>::SharedPtr stamped_sub_;
   rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr twist_sub_;
+  rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_sub_;
+  rclcpp::Subscription<std_msgs::msg::UInt64>::SharedPtr keepalive_sub_;
+  rclcpp::Service<MotionService>::SharedPtr motion_service_;
   Service::SharedPtr service_;
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr reset_odom_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr calibrate_imu_;
   rclcpp::TimerBase::SharedPtr poll_timer_, control_timer_, health_timer_;
 };
 }  // namespace vehicle_driver

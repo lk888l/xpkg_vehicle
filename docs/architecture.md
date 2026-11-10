@@ -7,15 +7,18 @@ ROS 节点关系、全部应用话题 / 服务、QoS 和数据字段见 [ROS 2 �
 ```mermaid
 flowchart LR
   Gui[vehicle_gui / PyQt5 + rclpy] --> Cmd[TwistStamped / Twist]
-  Gui --> Svc[Command service]
+  Gui --> Svc[Command / ExecuteMotion services]
   Output --> Gui
   Cmd --> Node[vehicle_driver::VehicleNode]
   Svc --> Node
   Node --> Codec[vehicle_core codec / variant events]
-  Node --> Odom[Odometry / CommandBuffer]
+  Node --> Odom[Odometry / CommandBuffer / MotionController]
   Codec --> Transport[CanTransport interface]
   Transport --> Socket[SocketCan RAII adapter]
   Socket <--> CAN[Linux can0 / MARK1_DIFF]
+  IMU[Linux can1 / HPM IMU CAN-FD] <--> ImuNode[vehicle_driver::ImuNode]
+  ImuNode -->|imu/data| Node
+  ImuNode -->|姿态与状态| Gui
   Node --> Output[typed telemetry / odom / TF / diagnostics]
   Interfaces[vehicle_interfaces] -. messages and service .-> Node
 ```
@@ -23,6 +26,7 @@ flowchart LR
 - `vehicle_core`：不包含 ROS 头文件。协议编码/解码为纯函数；`std::variant` 表达不同反馈，避免共享万能数组及隐式有效位。`CanTransport` 是传输端口，`SocketCan` 是 Linux 适配器，文件描述符 RAII 管理；以后可替换为回放或其他测试实现。
 - `vehicle_interfaces`：只放消息与服务，不依赖驱动实现；上层应用无需依赖 SocketCAN。
 - `vehicle_driver`：ROS 适配与设备会话的组合入口。显式拥有配置、命令缓存、SocketCAN、里程计和待应答事务；没有 singleton、跨节点共享可变静态变量或 ROS 1/2 条件编译。
+- `vehicle_driver::ImuNode`：独立节点，使用 `ImuSocketCan` 接收标准 CAN-FD PDO，避免改变底盘 Classic CAN 类型约束。发布标准惯性消息和状态，底盘里程计订阅有效姿态。GUI 内 `SteeringController` 负责键盘直行保向；驱动内纯 C++ `MotionController` 负责定角和定距任务、几何/滑移前馈、IMU 闭环、到位检测及超时。两者最终仍使用原有车体 vx/wz 协议。详见 [IMU 架构与协议](imu.md)。
 - `vehicle_gui`：独立 Python 展示层，View/ViewModel 与 rclpy 适配器分离；主线程处理 Qt，工作线程处理 DDS，不打开 CAN。遥测通过有界线程安全快照传递，运动输入必须持续续期。细节见[GUI 使用与设计](gui.md)，各功能的 CAN 发送顺序、频率与反馈映射见 [GUI 与 CAN 对照](gui-can.md)。
 
 没有强行引入 `ros2_control` 的轮速控制器：当前固件已经提供整车 vx/wz 控制，轮径、减速比、有效轮距均未独立校准。增加轮级 hardware interface 会引入未经验证的单位和重复控制环。后续若确认轮级协议，可在稳定的传输端口旁扩展，不需要修改现有整车协议。
@@ -46,6 +50,12 @@ flowchart LR
 显式服务操作取消尚未完成的自动初始化。运行中不会自动重新使能，也不抢回 CAN 模式。改变模式、失能、清计数器、复位会清空当前速度缓存并发零速；非数值或过时速度会清空旧命令。心跳过期也停止缓存命令。输入恢复需要新的有效命令。
 
 配置参数只读，避免“ROS 参数改了、内部缓存未同步”的假成功。改配置通过重启完成；频繁设备操作通过类型化服务完成。
+
+## 启动 yaw 方向标定
+
+`vehicle_core::YawCalibration` 是无 ROS 依赖的非阻塞状态机。驱动启动默认请求一次标定，看到已使能的 CAN 模式与新鲜 IMU 后，依次零速等待、正转、停转等待、反转、停止验证。使用未经符号修正的安装变换后 yaw 测量两段增量，双向响应足够且符号相反时提交 +1 / -1。随后仅对进入里程计的 yaw 乘系数，并重新建立 IMU 基线，保留已有位姿。标定期间里程计使用底盘角速度；自动标定未成功时也继续使用底盘反馈，避免用未知符号闭环。关闭自动标定时使用配置的人工系数。
+
+标定使用原有控制定时器直接发送线速度为零的 CAN 运动帧；它不依赖 GUI。cmd_vel 优先并取消待执行或活动标定，失能、模式切换、计数清零、里程计清零和断连也会结束活动标定。IMU 失效或单段测量超时停转，失败/取消后不自行重启；显式 Trigger 服务可重新请求。当前阶段和有效方向系数发布为持久状态，GUI 与 CSV 使用该结果。参数和具体语义见 [IMU 标定](imu.md#启动自动方向标定)。
 
 ## CAN 资源与故障处理
 
@@ -72,7 +82,7 @@ A3/A4/A5 无序号且无载荷，只能匹配功能码，因此同时只允许�
 
 ## 里程计
 
-速度路径使用 SE(2) 圆弧积分：`ds=vx·dt`、`dθ=wz·dt`，以 `sinc(dθ/2)` 计算弦长，没有低速死区、经验平滑或丢弃小增量。B2 的横移仅用于原始遥测，差速模型按 vy=0 积分。
+速度路径使用 SE(2) 圆弧积分：`ds=vx·dt`、IMU 有效时 `dθ=wrap(yaw_imu-yaw_imu_previous)`，否则 `dθ=wz·dt`，以 `sinc(dθ/2)` 计算弦长，没有低速死区、经验平滑或丢弃小增量。B2 的横移仅用于原始遥测，差速模型按 vy=0 积分。IMU 初次接入、失效恢复或 MCU 重启后对齐当前本地航向，避免姿态跳变。
 
 轮里程路径使用 B3 两路累计毫米值，int32 模运算处理回绕，以 `(dr+dl)/2` 和 `(dr-dl)/effective_track_width` 积分。有效轮距需要地面标定。超过 250 ms 的间隔或明显不可能的单步变化重新建立基线，保留当前位姿；没有对外部未应答的小幅计数重置作出无依据猜测。
 

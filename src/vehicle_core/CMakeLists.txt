@@ -1,7 +1,8 @@
 cmake_minimum_required(VERSION 3.16)
 project(vehicle_core VERSION 1.0.0 LANGUAGES CXX)
 find_package(ament_cmake REQUIRED)
-add_library(${PROJECT_NAME} SHARED src/protocol.cpp src/socketcan.cpp src/odometry.cpp)
+add_library(${PROJECT_NAME} SHARED src/protocol.cpp src/socketcan.cpp src/odometry.cpp
+  src/imu.cpp src/imu_socketcan.cpp src/yaw_calibration.cpp src/motion_controller.cpp)
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)
 target_include_directories(${PROJECT_NAME} PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:include>)

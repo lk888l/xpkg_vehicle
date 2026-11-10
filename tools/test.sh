@@ -6,6 +6,7 @@ source install/setup.bash
 source tools/gui_env.sh
 export QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-offscreen}"
 export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-91}"
+export ROS_LOG_DIR="$PWD/log/ros-tests"
 export VEHICLE_TEST_CAN="${VEHICLE_TEST_CAN:-vcan_veh_test}"
 created=0
 cleanup() {

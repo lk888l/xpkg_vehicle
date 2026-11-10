@@ -14,6 +14,7 @@ from PyQt5.QtWidgets import (QAbstractItemView, QAbstractSpinBox, QApplication, 
 import pyqtgraph as pg
 
 from .model import COMMAND_NAMES, connection_state, describe_result
+from .steering import SteeringController, wrap
 
 STYLE = """
 QMainWindow, QWidget#root { background: #f3f5f9; color: #1c2c44; }
@@ -92,6 +93,9 @@ class MainWindow(QMainWindow):
         self.setStyleSheet(STYLE)
         self.started = time.monotonic()
         self._held = set()
+        self.steering = SteeringController()
+        self._motion_revision = None
+        self._motion_goal_id = None
         self._last_control_tick = self.started
         self._last_tables = 0.0
         self._event_revision = 0
@@ -217,6 +221,92 @@ class MainWindow(QMainWindow):
         self.stop_button = self._button("停止运动  /  空格", self.stop_controls, "stop", False)
         self.stop_button.setMinimumHeight(42)
         layout.addWidget(self.stop_button)
+        self.heading_hold = QCheckBox("直行时用 IMU 保持航向")
+        self.heading_hold.setChecked(True)
+        layout.addWidget(self.heading_hold)
+        self.calibration_label = label("IMU 方向标定 · 等待驱动")
+        self.calibration_label.setWordWrap(True)
+        layout.addWidget(self.calibration_label)
+        self.calibration_button = self._button("开始 IMU 标定", self._calibrate_imu)
+        self.calibration_button.setToolTip("自动原地正反转，测定 yaw 方向；停止按钮或方向键可随时接管")
+        layout.addWidget(self.calibration_button)
+        self.zero_imu_button = self._button("IMU 角度置零", self._zero_imu)
+        self.zero_imu_button.setToolTip("停止当前控制，将当前姿态设为横滚、俯仰和 IMU 航向的零点；需要有效姿态数据")
+        self.zero_imu_button.setEnabled(False)
+        layout.addWidget(self.zero_imu_button)
+        layout.addWidget(label("角度转向 · 左正 / 右负", "section"))
+        angle_row = QHBoxLayout()
+        self.turn_angle = QDoubleSpinBox()
+        self.turn_angle.setRange(-360, 360)
+        self.turn_angle.setDecimals(1)
+        self.turn_angle.setSingleStep(15)
+        self.turn_angle.setValue(90)
+        self.turn_angle.setSuffix("°")
+        self.turn_reference = QComboBox()
+        self.turn_reference.addItems(["相对转角", "路径航向"])
+        self.turn_reference.setToolTip("相对转角按指定正负方向旋转；路径航向以本次里程计零点为参考，走最短转向")
+        angle_row.addWidget(self.turn_angle)
+        angle_row.addWidget(self.turn_reference)
+        layout.addLayout(angle_row)
+        self.turn_button = self._button("执行角度转向", self._start_turn)
+        layout.addWidget(self.turn_button)
+        layout.addWidget(label("定距离前进 · IMU 保向", "section"))
+        distance_row = QHBoxLayout()
+        self.drive_distance = QDoubleSpinBox()
+        self.drive_distance.setRange(0.01, 100)
+        self.drive_distance.setDecimals(3)
+        self.drive_distance.setSingleStep(0.1)
+        self.drive_distance.setValue(1.0)
+        self.drive_distance.setSuffix(" m")
+        self.distance_button = self._button("执行前进", self._start_distance)
+        distance_row.addWidget(self.drive_distance)
+        distance_row.addWidget(self.distance_button)
+        layout.addLayout(distance_row)
+        hint = label("上方直行 / 旋转速度作为执行上限\n参数在下次执行时生效")
+        hint.setWordWrap(True)
+        layout.addWidget(hint)
+        self.motion_status_label = label("自动运动 · 等待命令")
+        self.motion_status_label.setWordWrap(True)
+        layout.addWidget(self.motion_status_label)
+        self.parameter_toggle = QPushButton("展开转向与行驶参数")
+        self.parameter_toggle.setCheckable(True)
+        layout.addWidget(self.parameter_toggle)
+        self.parameter_panel = QWidget()
+        parameters = QGridLayout(self.parameter_panel)
+        parameters.setContentsMargins(0, 0, 0, 0)
+        self.motion_fields = {}
+        specs = [
+            ("track_width", "左右轮距 · mm", 50, 5000, 535, 1, 1),
+            ("wheelbase", "前后轴距 · mm", 50, 5000, 420, 1, 1),
+            ("skid_compensation", "滑移前馈系数 k", 0, 5, 0.5, 0.1, 2),
+            ("heading_gain", "航向增益 · 1/s", 0.01, 20, 1.8, 0.1, 2),
+            ("yaw_rate_gain", "角速度反馈增益", 0, 5, 0.2, 0.1, 2),
+            ("angle_tolerance", "到位角度误差 · °", 0.1, 20, 1, 0.1, 1),
+            ("distance_gain", "距离增益 · 1/s", 0.01, 10, 0.8, 0.1, 2),
+            ("distance_tolerance", "到位距离误差 · mm", 1, 200, 10, 1, 1),
+            ("timeout", "执行超时 · s", 1, 3600, 120, 10, 0),
+        ]
+        for row, (name, title, low, high, default, step, decimals) in enumerate(specs):
+            box = QDoubleSpinBox()
+            box.setRange(low, high)
+            box.setDecimals(decimals)
+            box.setSingleStep(step)
+            box.setValue(default)
+            parameters.addWidget(label(title), row, 0)
+            parameters.addWidget(box, row, 1)
+            self.motion_fields[name] = box
+        self.feedforward_label = label("")
+        self.feedforward_label.setWordWrap(True)
+        parameters.addWidget(self.feedforward_label, len(specs), 0, 1, 2)
+        for key in ("track_width", "wheelbase", "skid_compensation"):
+            self.motion_fields[key].valueChanged.connect(self._update_feedforward)
+        self._update_feedforward()
+        layout.addWidget(self.parameter_panel)
+        self.parameter_panel.hide()
+        self.parameter_toggle.toggled.connect(self._toggle_parameters)
+        self.steering_label = label("W/S 直行保向 · A/D 自由转弯\n方向键可随时接管角度转向")
+        self.steering_label.setWordWrap(True)
+        layout.addWidget(self.steering_label)
         layout.addSpacing(4)
         layout.addWidget(label("设备操作", "section"))
         enable_row = QHBoxLayout()
@@ -294,6 +384,16 @@ class MainWindow(QMainWindow):
         self.fit_trajectory_button = self._button("显示完整轨迹", self._fit_trajectory, service=False)
         trajectory_toolbar.addWidget(self.fit_trajectory_button)
         layout.addLayout(trajectory_toolbar)
+        recording = QHBoxLayout()
+        self.record_button = self._button("开始记录路径", self._toggle_recording, service=False)
+        recording.addWidget(self.record_button)
+        recording.addWidget(self._button("导出当前路径", self.export_path, service=False))
+        self.record_label = label("路径记录包含航向、控制目标与 IMU 状态")
+        recording.addWidget(self.record_label, 1)
+        layout.addLayout(recording)
+        self.imu_label = label("IMU · 等待 can1 姿态反馈")
+        self.imu_label.setWordWrap(True)
+        layout.addWidget(self.imu_label)
         self.pose_label = label("X —    Y —    航向 —    ·    等待里程计反馈")
         self.pose_label.setStyleSheet("color:#304a69;font-size:14px")
         self.pose_label.setWordWrap(True)
@@ -307,10 +407,11 @@ class MainWindow(QMainWindow):
         self.trajectory.setMinimumHeight(560)
         self.path_curve = self.trajectory.plot(pen=pg.mkPen("#2464d7", width=2))
         self.heading = self.trajectory.plot(pen=pg.mkPen("#e8a137", width=3))
+        self.target_heading = self.trajectory.plot(pen=pg.mkPen("#29926b", width=2, style=Qt.DashLine))
         self.position = self.trajectory.plot(pen=None, symbol="o", symbolSize=9, symbolBrush="#e8a137", symbolPen=None)
         layout.addWidget(self.trajectory, 1)
         note = label("轨迹内滚轮缩放 · 拖动平移 · 图外滚轮或右侧滚动条滚动页面\n"
-                     "轨迹由设备反馈积分计算；低速抖动请结合原始曲线判断。")
+                     "橙线为当前航向，绿虚线为目标航向。IMU 有效时修正转向，缺失时使用底盘里程计。")
         note.setWordWrap(True)
         layout.addWidget(note)
         layout.addSpacing(8)
@@ -375,37 +476,141 @@ class MainWindow(QMainWindow):
         return page
 
     def _press(self, token):
+        self._motion_revision = None
+        if self.steering.turning:
+            self.steering.cancel()
         self._held.add(token)
         self._last_control_tick = time.monotonic()
         self._renew_motion()
 
     def _release(self, token):
+        if token not in self._held:
+            return
         self._held.discard(token)
         if self._held:
             self._renew_motion()
         else:
+            self.steering.cancel()
             self.model.lease.stop()
+
+    def _heading_feedback(self):
+        sample = self.model.store.latest("heading")
+        if sample and sample.fresh(0.25) and sample.value["imu_active"] and \
+                0 <= sample.value["imu_age"] + sample.age() < 0.25:
+            return sample.value["yaw"], sample.value["wz"]
+        return None, 0.0
+
+    def _steering_state(self):
+        status = self.model.store.latest("motion_status")
+        if status and status.fresh(0.5) and status.value["active"] and not self._held:
+            value = status.value
+            self.model.store.update("steering", {"mode": value["message"],
+                "target": wrap(value["target_yaw"]), "error": value["heading_error"]})
+            return
+        self.model.store.update("steering", {
+            "mode": self.steering.mode, "target": None if self.steering.target is None else wrap(self.steering.target),
+            "error": self.steering.error})
+
+    def _start_turn(self):
+        self._start_motion(1 if self.turn_reference.currentIndex() == 0 else 2,
+                           math.radians(self.turn_angle.value()))
+
+    def _start_distance(self):
+        self._start_motion(3, self.drive_distance.value())
+
+    def _toggle_parameters(self, visible):
+        self.parameter_panel.setVisible(visible)
+        self.parameter_toggle.setText("收起转向与行驶参数" if visible else "展开转向与行驶参数")
+        # Recompute the independently scrolling control panel after expansion.
+        panel = self.parameter_panel.parentWidget()
+        panel.layout().activate()
+        panel.setMinimumHeight(panel.minimumSizeHint().height())
+
+    def _update_feedforward(self):
+        width = self.motion_fields["track_width"].value()
+        length = self.motion_fields["wheelbase"].value()
+        coefficient = self.motion_fields["skid_compensation"].value()
+        gain = 1 + coefficient * (length / width) ** 2
+        self.feedforward_label.setText(f"估算前馈倍率 {gain:.3f}\n四个固定动力轮 · k 需按地面调试")
+
+    def _start_motion(self, mode, target):
+        yaw, _ = self._heading_feedback()
+        if yaw is None:
+            self.model.store.event("暂无有效 IMU 航向，无法执行自动运动；方向键仍可使用", "warning")
+            return
+        if self.angular.value() <= 0:
+            self.model.store.event("请将旋转速度设为大于 0", "warning")
+            return
+        if mode == 3 and self.linear.value() <= 0:
+            self.model.store.event("请将直行速度设为大于 0", "warning")
+            return
+        fields = {name: box.value() for name, box in self.motion_fields.items()}
+        for name in ("track_width", "wheelbase", "distance_tolerance"):
+            fields[name] /= 1000
+        fields["angle_tolerance"] = math.radians(fields["angle_tolerance"])
+        self._clear_controls()
+        self._motion_revision = self.model.execute_motion(mode=mode, target=target,
+            use_custom_config=True, max_linear_speed=max(0.01, self.linear.value()), max_angular_speed=self.angular.value(),
+            client_timeout=0.35, **fields)
+        self._last_control_tick = time.monotonic()
+        self._steering_state()
+        self.setFocus()
 
     def _renew_motion(self):
         actions = {token.split(":", 1)[1] for token in self._held}
         vx = (int("forward" in actions) - int("reverse" in actions)) * self.linear.value()
         wz = (int("left" in actions) - int("right" in actions)) * self.angular.value()
+        yaw, rate = self._heading_feedback()
+        self.steering.gain = self.motion_fields["heading_gain"].value()
+        vx, wz = self.steering.manual(vx, wz, yaw, self.heading_hold.isChecked(), self.angular.value())
+        if self.steering.mode == "直行保向":
+            width = self.motion_fields["track_width"].value()
+            length = self.motion_fields["wheelbase"].value()
+            gain = 1 + self.motion_fields["skid_compensation"].value() * (length / width) ** 2
+            wz = max(-self.angular.value(), min(self.angular.value(), gain * wz +
+                     self.motion_fields["yaw_rate_gain"].value() * (wz - rate)))
         self.model.lease.renew(vx, wz)
+        self._steering_state()
 
     def _control_tick(self):
         now = time.monotonic()
-        if now - self._last_control_tick > 0.18 and self._held:
+        if now - self._last_control_tick > 0.18 and (self._held or self._motion_revision is not None):
             self.stop_controls()
             self.model.store.event("界面响应中断，运动已停止；重新按下方向键继续", "warning")
         self._last_control_tick = now
         if self._held:
             self._renew_motion()
+        elif self._motion_revision is not None:
+            status = self.model.store.latest("motion_status")
+            finished = (status and status.value["goal_id"] == self._motion_goal_id and
+                        not status.value["active"])
+            if finished or not self.model.lease.keepalive(self._motion_revision, now):
+                self._motion_revision = None
+                self._motion_goal_id = None
+            self._steering_state()
 
-    def stop_controls(self):
+    def _clear_controls(self):
+        self._motion_revision = None
+        self._motion_goal_id = None
         self._held.clear()
+        self.steering.cancel()
+        self._steering_state()
         for button in self.direction_buttons.values():
             button.setDown(False)
+
+    def stop_controls(self):
+        self._clear_controls()
         self.model.lease.stop()
+
+    def _calibrate_imu(self):
+        self._clear_controls()
+        self.model.calibrate_imu()
+        self.setFocus()
+
+    def _zero_imu(self):
+        self.stop_controls()
+        self.model.zero_imu()
+        self.setFocus()
 
     def _command(self, command, **fields):
         if command in (3, 5, 17):
@@ -417,6 +622,7 @@ class MainWindow(QMainWindow):
 
     def _reset_odometry(self):
         self.stop_controls()
+        self.steering.reset()
         self.model.reset_odometry()
 
     def _clear_trajectory(self):
@@ -444,6 +650,11 @@ class MainWindow(QMainWindow):
             if key in (Qt.Key_Space, Qt.Key_Escape):
                 self.stop_controls()
                 return True
+            if key in self.key_actions and event.type() == QEvent.KeyRelease and not event.isAutoRepeat():
+                token = f"key{key}:" + self.key_actions[key]
+                if token in self._held:
+                    self._release(token)
+                    return True
             if isinstance(QApplication.focusWidget(), (QLineEdit, QAbstractSpinBox, QComboBox, QPlainTextEdit)):
                 return False
             if key in self.key_actions:
@@ -456,12 +667,35 @@ class MainWindow(QMainWindow):
     def _set_busy(self, busy):
         for button in self.service_buttons:
             button.setEnabled(not busy)
+        self._update_imu_buttons()
         if busy:
             self.result_title.setText("等待设备反馈…")
             self.result_flags.setText("等待发送 / 应答 / 状态结果")
 
     def _result(self, result):
         _, text = describe_result(result)
+        if result.get("kind") == "execute_motion":
+            if result.get("request_accepted") and not result.get("superseded"):
+                self._motion_goal_id = result["goal_id"]
+            self.result_title.setText("自动运动")
+            self.result_flags.setText("请求已取消" if result.get("superseded") else
+                                      ("请求已受理 · 完成状态见上方" if result.get("request_accepted") else "请求未受理"))
+            self.result_detail.setText(text)
+            self.result_detail.setToolTip(result.get("message", ""))
+            return
+        if result.get("kind") == "zero_imu":
+            self.result_title.setText("IMU 角度置零")
+            self.result_flags.setText("置零完成" if result.get("state_confirmed") else "置零失败")
+            self.result_detail.setText(text)
+            self.result_detail.setToolTip(result.get("message", ""))
+            return
+        if result.get("kind") == "calibrate_imu":
+            self.result_title.setText("IMU 方向标定")
+            self.result_flags.setText("请求已取消" if result.get("superseded") else
+                                      ("请求已受理 · 完成状态见上方" if result.get("request_accepted") else "请求未受理"))
+            self.result_detail.setText(text)
+            self.result_detail.setToolTip(result.get("message", ""))
+            return
         self.result_title.setText(COMMAND_NAMES.get(result.get("command"), "重置本地里程计"))
         ack_expected = result.get("command") in (2, 3, 4, 5)
         flag = lambda key: "✓" if result.get(key) else "—"
@@ -482,9 +716,66 @@ class MainWindow(QMainWindow):
         item.setText(str(text))
         item.setForeground(QColor("#a08557" if stale else "#30465f"))
 
+    @staticmethod
+    def _imu_orientation_available(status, imu, now=None):
+        return bool(status and status.fresh(0.3, now) and status.value["orientation_valid"] and
+                    0 <= status.value["orientation_age"] + status.age(now) < 0.25 and
+                    imu and imu.fresh(0.25, now) and imu.value.get("valid"))
+
+    def _update_imu_buttons(self):
+        sample = self.model.store.latest("imu_calibration")
+        state = sample.value["state"] if sample else 0
+        running = sample is not None and sample.fresh(0.5) and 1 <= state <= 6
+        self.calibration_button.setEnabled(not self.model.busy and not running)
+        self.calibration_button.setText(("标定等待中…" if state == 1 else "标定进行中…") if running else
+                                         ("重新标定 IMU" if state >= 7 else "开始 IMU 标定"))
+        self.zero_imu_button.setEnabled(not self.model.busy and self._imu_orientation_available(
+            self.model.store.latest("imu_status"), self.model.store.latest("imu")))
+
     def refresh(self):
         now = time.monotonic()
         latest, history, frames, events, revision = self.model.store.snapshot()
+        self._update_imu_buttons()
+        calibration = latest.get("imu_calibration")
+        if calibration:
+            c = calibration.value
+            phases = {0: "自动标定关闭", 1: "等待底盘与 IMU", 2: "标定准备中", 3: "正转测量",
+                      4: "停转等待", 5: "反转回位测量", 6: "检查双向结果", 7: "方向标定完成",
+                      8: "标定失败，已停止", 9: "标定已取消"}
+            direction = "正向 +1" if c["yaw_sign"] > 0 else "反向 -1"
+            state = phases.get(c["state"], "未知状态")
+            if not calibration.fresh(0.5):
+                state += " · 状态过期"
+            self.calibration_label.setText(f"IMU · {state}\n航向系数 {direction}" +
+                                           (" · 已测定" if c["calibrated"] else " · 配置初值"))
+            self.calibration_label.setToolTip(c["message"] +
+                f"\n正转 yaw 变化 {math.degrees(c['positive_delta']):+.2f}°，反转 {math.degrees(c['negative_delta']):+.2f}°")
+        imu_status = latest.get("imu_status")
+        imu = latest.get("imu")
+        if imu_status:
+            s = imu_status.value
+            valid = self._imu_orientation_available(imu_status, imu, now)
+            angles = ("   横滚 {:+.1f}°   俯仰 {:+.1f}°   IMU 相对航向 {:+.1f}°".format(
+                *(math.degrees(imu.value[k]) for k in ("roll", "pitch", "yaw"))) if valid else "")
+            self.imu_label.setText(("IMU 姿态有效" if valid else "IMU 姿态不可用 · 使用底盘里程计") + angles +
+                                   f"   RX {s['rx_frames']}   故障 0x{s['faults']:X}")
+            self.imu_label.setToolTip(s["message"])
+        steering = self.steering
+        status = latest.get("motion_status")
+        target_yaw = steering.target
+        if status and status.value["goal_id"]:
+            motion = status.value
+            remaining = f"{motion['remaining']:+.3f} m" if motion["mode"] == 3 else f"{math.degrees(motion['remaining']):+.1f}°"
+            stale = " · 状态过期" if not status.fresh(0.5, now) else ""
+            self.motion_status_label.setText(f"{motion['message']}{stale}\n剩余 {remaining} · 前馈 {motion['feedforward_gain']:.3f}")
+            if motion["active"] and not stale and not self._held:
+                target_yaw = motion["target_yaw"]
+        target = "" if target_yaw is None else f" · 目标 {math.degrees(wrap(target_yaw)):+.1f}°"
+        self.steering_label.setText(steering.mode + target + "\nW/S 直行保向 · A/D 自由转弯")
+        recording, count, error = self.model.store.recording_status()
+        self.record_button.setText("结束路径记录" if recording else "开始记录路径")
+        self.record_label.setText((f"记录中 · {count} 个点" if recording else f"已记录 {count} 个点") +
+                                  (" · 写入失败：" + error if error else ""))
         state = latest.get("state")
         status_text, online = connection_state(state, now)
         self.connection.setText(status_text)
@@ -519,14 +810,21 @@ class MainWindow(QMainWindow):
                 p = pose.value
                 self.pose_label.setText(f"X  {p['x']:+.3f} m    Y  {p['y']:+.3f} m    航向  {math.degrees(p['yaw']):+.1f}°"
                                        f"    ·    {p['frame']} → {p['child']}" +
+                                       (" · IMU 修正" if p.get("imu_active") else " · 底盘积分") +
                                        ("    ·    反馈过期" if not pose.fresh(0.3, now) else ""))
                 self.position.setData([p['x']], [p['y']])
                 self.heading.setData([p['x'], p['x'] + 0.08 * math.cos(p['yaw'])],
                                      [p['y'], p['y'] + 0.08 * math.sin(p['yaw'])])
+                if target_yaw is not None:
+                    self.target_heading.setData([p['x'], p['x'] + 0.14 * math.cos(target_yaw)],
+                                                [p['y'], p['y'] + 0.14 * math.sin(target_yaw)])
+                else:
+                    self.target_heading.setData([], [])
             else:
                 self.pose_label.setText("X —    Y —    航向 —    ·    等待里程计反馈")
                 self.position.setData([], [])
                 self.heading.setData([], [])
+                self.target_heading.setData([], [])
         if now - self._last_tables > 0.25:
             self._last_tables = now
             self._update_tables(latest, frames, now)
@@ -561,12 +859,16 @@ class MainWindow(QMainWindow):
         # Repeated identical points can create raster artifacts with a thick Qt pen.
         # Remove only exact duplicates; preserve all nonzero measured displacement.
         points = []
-        for _, pose in history["odom"]:
+        previous_stamp = None
+        for stamp, pose in history["odom"]:
             point = (pose["x"], pose["y"])
+            if previous_stamp is not None and stamp - previous_stamp > 0.3:
+                points.append((float("nan"), float("nan")))
             if not points or point != points[-1]:
                 points.append(point)
+            previous_stamp = stamp
         self.path_curve.setData([x for x, _ in points] if len(points) > 1 else [],
-                                [y for _, y in points] if len(points) > 1 else [])
+                                [y for _, y in points] if len(points) > 1 else [], connect="finite")
 
     def _update_tables(self, latest, frames, now):
         for channel in range(4):
@@ -603,6 +905,30 @@ class MainWindow(QMainWindow):
             observed += " · 已过期"
         self.unknowns.setText(f"{observed}   ·   刹车 / 特殊功能：未知\n"
                              f"B1 D5：{flags}   ·   故障帧：{fault_text}")
+
+    def _toggle_recording(self):
+        if self.model.store.recording_status()[0]:
+            self.model.store.stop_recording()
+            self.model.store.event("路径记录已保存")
+            return
+        self.stop_controls()
+        name, _ = QFileDialog.getSaveFileName(self, "记录路径", "vehicle_path.csv", "CSV (*.csv)")
+        if name:
+            try:
+                self.model.store.start_recording(name)
+                self.model.store.event("开始记录路径 · " + name)
+            except (OSError, RuntimeError) as error:
+                self.model.store.event("无法记录路径 · " + str(error), "error")
+
+    def export_path(self):
+        self.stop_controls()
+        name, _ = QFileDialog.getSaveFileName(self, "导出当前路径", "vehicle_path_snapshot.csv", "CSV (*.csv)")
+        if name:
+            try:
+                self.model.store.export_path(name)
+                self.model.store.event("路径已导出 · " + name)
+            except OSError as error:
+                self.model.store.event("导出失败 · " + str(error), "error")
 
     def export_csv(self):
         self.stop_controls()

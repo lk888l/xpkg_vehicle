@@ -14,16 +14,21 @@ class Odometry {
   explicit Odometry(double track_width = 0, double max_gap = 0.25, double max_wheel_speed = 10.0);
   bool update(const Motion& motion, double monotonic_time);
   bool update(const Mileage& mileage, double monotonic_time);
+  void set_heading(double yaw, double monotonic_time);
+  void invalidate_heading();
+  bool heading_fresh(double monotonic_time) const;
+  double heading_age(double monotonic_time) const;
   void rebase();  // Preserve pose, discard counter/time baseline after reconnect or A5.
   void reset();
   const Pose& pose() const noexcept { return pose_; }
   uint64_t discontinuities() const noexcept { return discontinuities_; }
 
  private:
-  void integrate(double distance, double angle, double dt);
+  void integrate(double distance, double angle, double dt, double time);
   double track_width_, max_gap_, max_wheel_speed_;
   std::optional<double> last_time_;
   std::optional<Mileage> last_mileage_;
+  std::optional<double> imu_yaw_, imu_time_, integrated_imu_yaw_;
   Pose pose_{};
   uint64_t discontinuities_{};
 };

@@ -1,0 +1,27 @@
+<launch>
+  <arg name="config" default="$(find vehicle_driver)/config/vehicle.yaml"/>
+  <arg name="namespace" default="/"/>
+  <arg name="can_interface" default="can0"/>
+  <arg name="imu_can_interface" default="can1"/>
+  <arg name="start_imu" default="true"/>
+  <arg name="receive_only" default="true"/>
+  <arg name="auto_initialize" default="false"/>
+  <arg name="auto_imu_calibration" default="false"/>
+  <arg name="use_stamped_cmd_vel" default="true"/>
+  <arg name="imu_auto_start" default="true"/>
+  <group ns="$(arg namespace)">
+    <node pkg="vehicle_driver" type="imu_node" name="imu" output="screen" if="$(arg start_imu)">
+      <rosparam command="load" file="$(arg config)"/>
+      <param name="imu_can_interface" value="$(arg imu_can_interface)"/>
+      <param name="imu_auto_start" value="$(arg imu_auto_start)"/>
+    </node>
+    <node pkg="vehicle_driver" type="vehicle_node" name="vehicle" output="screen">
+      <rosparam command="load" file="$(arg config)"/>
+      <param name="can_interface" value="$(arg can_interface)"/>
+      <param name="receive_only" value="$(arg receive_only)"/>
+      <param name="auto_initialize" value="$(arg auto_initialize)"/>
+      <param name="auto_imu_calibration" value="$(arg auto_imu_calibration)"/>
+      <param name="use_stamped_cmd_vel" value="$(arg use_stamped_cmd_vel)"/>
+    </node>
+  </group>
+</launch>

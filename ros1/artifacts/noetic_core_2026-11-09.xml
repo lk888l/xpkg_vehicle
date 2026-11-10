@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites tests="32" failures="0" disabled="0" errors="0" time="0.009" timestamp="2026-11-09T19:05:18" name="AllTests">
+  <testsuite name="MotionController" tests="6" failures="0" disabled="0" errors="0" time="0.001" timestamp="2026-11-09T19:05:18">
+    <testcase name="GeometryAndFeedbackAreBoundedAndDistinct" status="run" result="completed" time="0.001" timestamp="2026-11-09T19:05:18" classname="MotionController" />
+    <testcase name="RelativeTurnsKeepDirectionAcrossWrapAndMultipleRevolutions" status="run" result="completed" time="0" timestamp="2026-11-09T19:05:18" classname="MotionController" />
+    <testcase name="AbsoluteHeadingTakesShortestPathAndMustSettle" status="run" result="completed" time="0" timestamp="2026-11-09T19:05:18" classname="MotionController" />
+    <testcase name="DistanceUsesStartHeadingProjectionAndConvergesInBothDirections" status="run" result="completed" time="0" timestamp="2026-11-09T19:05:18" classname="MotionController" />
+    <testcase name="TimeoutStaleFeedbackAndLeaseExpiryStopWithoutResuming" status="run" result="completed" time="0" timestamp="2026-11-09T19:05:18" classname="MotionController" />
+    <testcase name="RejectsInvalidGoalsWithoutReplacingRunningMotion" status="run" result="completed" time="0" timestamp="2026-11-09T19:05:18" classname="MotionController" />
+  </testsuite>
+  <testsuite name="Protocol" tests="10" failures="0" disabled="0" errors="0" time="0.003" timestamp="2026-11-09T19:05:18">
+    <testcase name="CommandGoldenFrames" status="run" result="completed" time="0" timestamp="2026-11-09T19:05:18" classname="Protocol" />
+    <testcase name="SignedLittleEndianMotionAndBounds" status="run" result="completed" time="0" timestamp="2026-11-09T19:05:18" classname="Protocol" />
+    <testcase name="AsciiVersion" status="run" result="completed" time="0" timestamp="2026-11-09T19:05:18" classname="Protocol" />
+    <testcase name="SixByteStatusNeverReadsTail" status="run" result="completed" time="0" timestamp="2026-11-09T19:05:18" classname="Protocol" />
+    <testcase name="ZeroLengthAcknowledgements" status="run" result="completed" time="0" timestamp="2026-11-09T19:05:18" classname="Protocol" />
+    <testcase name="IdentityAndFrameTypeIsolation" status="run" result="completed" time="0" timestamp="2026-11-09T19:05:18" classname="Protocol" />
+    <testcase name="RejectsEveryTruncatedKnownPayload" status="run" result="completed" time="0" timestamp="2026-11-09T19:05:18" classname="Protocol" />
+    <testcase name="DriverChannelsAndSignedValues" status="run" result="completed" time="0" timestamp="2026-11-09T19:05:18" classname="Protocol" />
+    <testcase name="SignedRemoteAxesAndRawLegacyFields" status="run" result="completed" time="0" timestamp="2026-11-09T19:05:18" classname="Protocol" />
+    <testcase name="ArbitraryFrameFuzzDoesNotReadOutsidePayload" status="run" result="completed" time="0.003" timestamp="2026-11-09T19:05:18" classname="Protocol" />
+  </testsuite>
+  <testsuite name="Control" tests="2" failures="0" disabled="0" errors="0" time="0" timestamp="2026-11-09T19:05:18">
+    <testcase name="LatestWinsClampsAndStopsOnce" status="run" result="completed" time="0" timestamp="2026-11-09T19:05:18" classname="Control" />
+    <testcase name="InvalidInputAndClockReversalStopInsteadOfReplaying" status="run" result="completed" time="0" timestamp="2026-11-09T19:05:18" classname="Control" />
+  </testsuite>
+  <testsuite name="Odometry" tests="6" failures="0" disabled="0" errors="0" time="0" timestamp="2026-11-09T19:05:18">
+    <testcase name="ExactCircularArcAndSmallMotionNotDeadbanded" status="run" result="completed" time="0" timestamp="2026-11-09T19:05:18" classname="Odometry" />
+    <testcase name="MissingFeedbackDoesNotExtrapolate" status="run" result="completed" time="0" timestamp="2026-11-09T19:05:18" classname="Odometry" />
+    <testcase name="MileageRolloverAndExplicitRebase" status="run" result="completed" time="0" timestamp="2026-11-09T19:05:18" classname="Odometry" />
+    <testcase name="DifferentialTurnAndDiscontinuity" status="run" result="completed" time="0" timestamp="2026-11-09T19:05:18" classname="Odometry" />
+    <testcase name="ImuReplacesWheelYawAndShapesTranslationArc" status="run" result="completed" time="0" timestamp="2026-11-09T19:05:18" classname="Odometry" />
+    <testcase name="ImuWrapFallbackRecoveryAndResetRemainContinuous" status="run" result="completed" time="0" timestamp="2026-11-09T19:05:18" classname="Odometry" />
+  </testsuite>
+  <testsuite name="Transport" tests="1" failures="0" disabled="0" errors="0" time="0.005" timestamp="2026-11-09T19:05:18">
+    <testcase name="MissingInterfaceIsActionable" status="run" result="completed" time="0.004" timestamp="2026-11-09T19:05:18" classname="Transport" />
+  </testsuite>
+  <testsuite name="Imu" tests="3" failures="0" disabled="0" errors="0" time="0" timestamp="2026-11-09T19:05:18">
+    <testcase name="FirmwarePdoUnitsSignedFieldsAndMappingIsolation" status="run" result="completed" time="0" timestamp="2026-11-09T19:05:18" classname="Imu" />
+    <testcase name="QuaternionFreshnessNormalizationAndMounting" status="run" result="completed" time="0" timestamp="2026-11-09T19:05:18" classname="Imu" />
+    <testcase name="DuplicateCountersExpireWrapIsContinuousAndRebootsAreDetected" status="run" result="completed" time="0" timestamp="2026-11-09T19:05:18" classname="Imu" />
+  </testsuite>
+  <testsuite name="YawCalibration" tests="4" failures="0" disabled="0" errors="0" time="0" timestamp="2026-11-09T19:05:18">
+    <testcase name="StartupIdentifiesBothSignsAcrossWrapAndReturnsNearStart" status="run" result="completed" time="0" timestamp="2026-11-09T19:05:18" classname="YawCalibration" />
+    <testcase name="MissingDataWaitsAndStalledMotionFailsWithStop" status="run" result="completed" time="0" timestamp="2026-11-09T19:05:18" classname="YawCalibration" />
+    <testcase name="ImuGapInvalidationAndManualCancelProduceOneStop" status="run" result="completed" time="0" timestamp="2026-11-09T19:05:18" classname="YawCalibration" />
+    <testcase name="RejectsSameDirectionInBothLegsAndInvalidConfiguration" status="run" result="completed" time="0" timestamp="2026-11-09T19:05:18" classname="YawCalibration" />
+  </testsuite>
+</testsuites>

@@ -1,0 +1,16 @@
+cmake_minimum_required(VERSION 3.10)
+project(vehicle_driver VERSION 1.0.0 LANGUAGES CXX)
+find_package(catkin REQUIRED COMPONENTS roscpp vehicle_core vehicle_interfaces
+  geometry_msgs nav_msgs sensor_msgs std_msgs std_srvs diagnostic_msgs tf2_ros)
+catkin_package(CATKIN_DEPENDS roscpp vehicle_core vehicle_interfaces geometry_msgs
+  nav_msgs sensor_msgs std_msgs std_srvs diagnostic_msgs tf2_ros)
+foreach(node vehicle_node imu_node)
+  add_executable(${node} src/${node}.cpp)
+  target_compile_features(${node} PRIVATE cxx_std_17)
+  target_compile_options(${node} PRIVATE -Wall -Wextra -Wpedantic -Wshadow)
+  target_include_directories(${node} SYSTEM PRIVATE ${catkin_INCLUDE_DIRS})
+  target_link_libraries(${node} ${catkin_LIBRARIES})
+  add_dependencies(${node} ${catkin_EXPORTED_TARGETS})
+  install(TARGETS ${node} RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
+endforeach()
+install(DIRECTORY launch config DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})

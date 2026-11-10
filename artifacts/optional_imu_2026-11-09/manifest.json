@@ -1,0 +1,77 @@
+[
+  {
+    "path": "README.md",
+    "before": "3869067a708064196107a1f4c58d82c9feacb25c79ca6bca0dadcb2603f6a021",
+    "after": "bfd0a13dc40c14f44f2fd9f3d6b84f817b01aeea5517a38b32c4771ba2a17779"
+  },
+  {
+    "path": "docs/optional-imu.md",
+    "before": null,
+    "after": "a249814fdd5f546897acd757ae8dbde4e62b1d84c45b13a2b34495864658f4f8"
+  },
+  {
+    "path": "src/vehicle_core/src/motion_controller.cpp",
+    "before": "a064a701f3b37b60884286bf522f6cc6e8613edb6eb670a8e0ae99cbdd2a139d",
+    "after": "ae2b92eb948c54a728ed002fa171f7beabedb0ca34e9cb53a34272268e07768e"
+  },
+  {
+    "path": "src/vehicle_driver/config/vehicle.yaml",
+    "before": "c9ebed71515034cd2b530b96d3dfaba0214ed36cdd4edfdc7b7e381952d1a844",
+    "after": "7ed2ded5f8d5651e461b09bd1b395cf3f5716a88fe90319fa49f5edea76dffb2"
+  },
+  {
+    "path": "src/vehicle_driver/launch/vehicle.launch",
+    "before": "fbccffd502c3ddf922a57687b2ed60e22573dea91f026b7afa29347595062c56",
+    "after": "329625f1588041e3a0ad08ab9781d5f3acdd2bc2b5b7ab700433dec54a98b3f7"
+  },
+  {
+    "path": "src/vehicle_driver/src/heading_policy.hpp",
+    "before": null,
+    "after": "10a888e0b04ba63b575c52f355c67f9971e014ee9cb53db938b6eac1ddf5861d"
+  },
+  {
+    "path": "src/vehicle_driver/src/vehicle_node.cpp",
+    "before": "f6f3e51dfebbe60f1add50d4ca1380c107b9f9e3185a35e102960e9fe472f410",
+    "after": "5b3ade79c8792f069cbd79b1173e5b3dff8dc0dcb6f8f54060ea7a5f03dec140"
+  },
+  {
+    "path": "src/vehicle_driver/test/test_integration.py",
+    "before": "4880a3dd089424e65138984fba8b0f583e8e81a83436df943187b45ca35c610b",
+    "after": "a75efa6b73e155293294177670a52f108a52f57d7d8dd9929b2bb3f06b3ce6fe"
+  },
+  {
+    "path": "src/vehicle_driver/test/test_optional_imu.py",
+    "before": null,
+    "after": "36dcd7121f694db07838b47aeafa3ccde9970e4a383e10229cd44684a957e12b"
+  },
+  {
+    "path": "src/vehicle_gui/launch/console.launch",
+    "before": "c59d7b6004913dff8608f1f69a5a93bd975b4b4e598384c69a6fc67873cfd1bf",
+    "after": "85c3940b74f9254c668473fcbb4529a81e7f4b675cd6b5cf365774fb75988ed9"
+  },
+  {
+    "path": "src/vehicle_gui/test/test_console.py",
+    "before": "ea88969806d50ffef4b0b17a2429825609391bf55f40168f5af7f4bc1649c752",
+    "after": "ad83d410d3817042c06351ce513f50a2af389f758461a576d4d45ebb492109cc"
+  },
+  {
+    "path": "src/vehicle_gui/vehicle_gui/ros_worker.py",
+    "before": "ec02055a512da292b962b53201ca2f1486784597d360f133385efd8fed986c49",
+    "after": "250dd8c2d7f07eb592e42c43e9ba99a3b9820380f8e9ebf13736a9a0682fd6cd"
+  },
+  {
+    "path": "src/vehicle_gui/vehicle_gui/steering.py",
+    "before": "85d1693c89c42d544795f78969ca79630159a03e06541e8137a0568bdbdca3ce",
+    "after": "a2729a55f2ba04fd2ef1f0f4efa821b127e8daaca47f105446499ef262dca13e"
+  },
+  {
+    "path": "src/vehicle_gui/vehicle_gui/window.py",
+    "before": "b9a44f20bb9fd1faff03f7e00d2f993f146a937af94cc376505e7ccdfb6d3e8e",
+    "after": "447b4d8c54aeb1928c535885733a1144f6baee2df12226be4cee7ccd71166300"
+  },
+  {
+    "path": "tools/hardware_smoke.py",
+    "before": "c3fcda198b96b39c048a31e40be887668b063fc02a0e03aa0cebe0f9bc374732",
+    "after": "0812458fec283f2ecac9ff07d6429ce1bbe05be5101df35037411ede0917c6d0"
+  }
+]

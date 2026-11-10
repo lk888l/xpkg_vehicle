@@ -15,7 +15,12 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/Remote.msg"
   "msg/Sensors.msg"
   "msg/Faults.msg"
+  "msg/ImuStatus.msg"
+  "msg/Heading.msg"
+  "msg/ImuCalibration.msg"
+  "msg/MotionStatus.msg"
   "srv/Command.srv"
+  "srv/ExecuteMotion.srv"
   DEPENDENCIES std_msgs builtin_interfaces)
 ament_export_dependencies(rosidl_default_runtime)
 ament_package()

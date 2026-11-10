@@ -48,7 +48,8 @@ def main():
     app.setFont(QFont("Noto Sans CJK SC", 10))
     binary = Path(get_package_prefix("vehicle_driver")) / "lib/vehicle_driver/vehicle_node"
     log = args.output.with_suffix(".log").open("w")
-    driver = subprocess.Popen([str(binary), "--ros-args", "-p", f"can_interface:={args.interface}"],
+    driver = subprocess.Popen([str(binary), "--ros-args", "-p", f"can_interface:={args.interface}",
+                               "-p", "auto_imu_calibration:=false"],
                               stdout=log, stderr=subprocess.STDOUT)
     model = VehicleViewModel(ros_args=[])
     window = MainWindow(model)

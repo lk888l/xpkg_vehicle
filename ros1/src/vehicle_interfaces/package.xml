@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>vehicle_interfaces</name><version>1.0.0</version>
+  <description>ROS1 MARK1 telemetry, IMU and motion service interfaces.</description>
+  <maintainer email="207119930@qq.com">Luka</maintainer><license>Apache-2.0</license>
+  <buildtool_depend>catkin</buildtool_depend>
+  <build_depend>message_generation</build_depend>
+  <depend>std_msgs</depend><exec_depend>message_runtime</exec_depend>
+</package>

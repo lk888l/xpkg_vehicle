@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Thread-safe state and short-lived operator intent, independent of Qt and ROS."""
 from collections import deque
+import csv
 from dataclasses import dataclass
 import math
 from threading import Lock
@@ -21,20 +22,110 @@ class Sample:
 
 
 class TelemetryStore:
-    def __init__(self, capacity=3000):
+    PATH_COLUMNS = ("monotonic_s", "ros_stamp_ns", "segment", "x", "y", "yaw", "vx", "wz",
+                    "imu_active", "imu_age", "imu_yaw", "imu_received", "heading_received",
+                    "heading_ros_stamp_ns", "target_yaw", "control_mode",
+                    "imu_yaw_sign", "imu_calibration_state",
+                    "command_vx", "command_wz", "frame", "child")
+
+    def __init__(self, capacity=3000, path_capacity=60000):
         self._lock = Lock()
         self._latest = {}
         self._history = {key: deque(maxlen=capacity) for key in ("velocity", "command", "odom")}
+        self._history["odom"] = deque(maxlen=path_capacity)
         self._frames = {}
         self._events = deque(maxlen=200)
         self._revision = 0
+        self._recording = None
+        self._writer = None
+        self._record_count = 0
+        self._record_error = ""
+        self._last_flush = 0.0
+        self._segment = 0
 
     def update(self, name, value, now=None):
         now = time.monotonic() if now is None else now
         with self._lock:
+            if name == "odom":
+                value = dict(value, monotonic_s=now, segment=self._segment)
+                heading = self._latest.get("heading")
+                value["imu_active"] = bool(heading and heading.fresh(0.25, now) and
+                                           heading.value["imu_active"] and
+                                           heading.value["imu_age"] + heading.age(now) < 0.25)
+                value["imu_age"] = (heading.value["imu_age"] + heading.age(now)) if \
+                    heading and heading.value["imu_age"] >= 0 else -1
+                if heading:
+                    value["heading_received"] = heading.received
+                    value["heading_ros_stamp_ns"] = heading.value.get("ros_stamp_ns", "")
+                for source, fields in (("imu", {"yaw": "imu_yaw"}),
+                                       ("imu_calibration", {"yaw_sign": "imu_yaw_sign", "state": "imu_calibration_state"}),
+                                       ("steering", {"target": "target_yaw", "mode": "control_mode"}),
+                                       ("command", {"vx": "command_vx", "wz": "command_wz"})):
+                    sample = self._latest.get(source)
+                    if sample:
+                        value.update({dest: sample.value.get(key) for key, dest in fields.items()})
+                        if source == "imu":
+                            value["imu_received"] = sample.received
+                if self._writer:
+                    try:
+                        self._writer.writerow({key: value.get(key, "") for key in self.PATH_COLUMNS})
+                        self._record_count += 1
+                        if now - self._last_flush >= 1:
+                            self._recording.flush()
+                            self._last_flush = now
+                    except OSError as error:
+                        self._record_error = str(error)
+                        try:
+                            self._recording.close()
+                        except OSError:
+                            pass
+                        self._recording = self._writer = None
             self._latest[name] = Sample(dict(value), now)
             if name in self._history:
+                # Keep a long display path; streaming CSV still receives every odometry sample.
+                if name == "odom" and self._history[name] and now - self._history[name][-1][0] < 0.10:
+                    return
                 self._history[name].append((now, dict(value)))
+
+    def latest(self, name):
+        with self._lock:
+            return self._latest.get(name)
+
+    def start_recording(self, path):
+        with self._lock:
+            if self._recording:
+                raise RuntimeError("路径记录已在运行")
+            stream = open(path, "w", newline="", encoding="utf-8")
+            try:
+                writer = csv.DictWriter(stream, fieldnames=self.PATH_COLUMNS)
+                writer.writeheader()
+            except Exception:
+                stream.close()
+                raise
+            self._recording, self._writer = stream, writer
+            self._record_count, self._record_error = 0, ""
+
+    def stop_recording(self):
+        with self._lock:
+            stream = self._recording
+            self._recording = self._writer = None
+            if stream:
+                try:
+                    stream.close()
+                except OSError as error:
+                    self._record_error = str(error)
+
+    def recording_status(self):
+        with self._lock:
+            return bool(self._recording), self._record_count, self._record_error
+
+    def export_path(self, path):
+        with self._lock:
+            rows = list(self._history["odom"])
+        with open(path, "w", newline="", encoding="utf-8") as stream:
+            writer = csv.DictWriter(stream, fieldnames=self.PATH_COLUMNS, extrasaction="ignore")
+            writer.writeheader()
+            writer.writerows(dict(value, monotonic_s=stamp) for stamp, value in rows)
 
     def frame(self, identifier, value):
         with self._lock:
@@ -64,6 +155,8 @@ class TelemetryStore:
             self._history["odom"].clear()
             if clear_pose:
                 self._latest.pop("odom", None)
+                self._latest.pop("heading", None)
+                self._segment += 1
 
 
 def connection_state(sample, now=None):
@@ -85,6 +178,7 @@ class MotionLease:
         self._received = 0.0
         self._active = False
         self._stop_pending = False
+        self._revision = 0
 
     def renew(self, vx, wz, now=None):
         now = time.monotonic() if now is None else now
@@ -92,16 +186,49 @@ class MotionLease:
             self.stop()
             return False
         with self._lock:
+            self._revision += 1
             self._value = (vx, wz)
             self._received = now
             self._active = True
             self._stop_pending = False
         return True
 
-    def stop(self):
+    def stop(self, revision=None):
         with self._lock:
+            if revision is not None and revision != self._revision:
+                return False
+            self._revision += 1
             self._active = False
             self._stop_pending = True
+            return True
+
+    def handoff(self):
+        """Release GUI motion; the receiving service itself stops the chassis.
+
+        Do not enqueue a zero cmd_vel here: it would cancel the new calibration.
+        Any subsequent operator input invalidates the returned request revision.
+        """
+        with self._lock:
+            self._revision += 1
+            self._active = self._stop_pending = False
+            self._received = time.monotonic()
+            return self._revision
+
+    def keepalive(self, revision, now=None):
+        with self._lock:
+            if revision != self._revision:
+                return False
+            self._received = time.monotonic() if now is None else now
+            return True
+
+    def fresh(self, revision, now=None):
+        now = time.monotonic() if now is None else now
+        with self._lock:
+            return revision == self._revision and 0 <= now - self._received < self.timeout
+
+    def is_current(self, revision):
+        with self._lock:
+            return revision == self._revision
 
     def sample(self, now=None):
         now = time.monotonic() if now is None else now
@@ -120,8 +247,24 @@ COMMAND_NAMES = {2: "查询版本", 3: "设置使能", 4: "清故障", 5: "设�
 
 
 def describe_result(result):
+    if result.get("kind") == "execute_motion":
+        if result.get("superseded"):
+            return "info", "运动请求已被停止或手动控制取消"
+        if result.get("request_accepted"):
+            return "info", "运动请求已受理；到位与停止原因见自动运动状态"
+        return "warning", "运动请求未受理 · " + result.get("message", "请检查底盘与 IMU")
+    if result.get("kind") == "calibrate_imu" and result.get("superseded"):
+        return "info", "IMU 标定请求已被停止或手动控制取消"
     if not result.get("sent"):
         return "error", result.get("message", "命令未发送")
+    if result.get("kind") == "calibrate_imu":
+        if result.get("request_accepted"):
+            return "info", "IMU 标定请求已受理；进度与最终结果见上方标定状态"
+        return "warning", "IMU 标定请求未受理 · " + result.get("message", "请查看标定状态")
+    if result.get("kind") == "zero_imu":
+        if result.get("state_confirmed"):
+            return "info", "IMU 横滚、俯仰和航向已以当前姿态置零"
+        return "warning", "IMU 角度置零失败 · " + result.get("message", "请检查姿态数据是否有效")
     command = result.get("command")
     if result.get("kind") == "reset_odometry":
         if result.get("state_confirmed"):

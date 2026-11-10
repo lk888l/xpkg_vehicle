@@ -1,0 +1,29 @@
+# Host-side IMU closed-loop goals; CAN still uses body vx / yaw rate (0x12).
+uint8 CANCEL=0
+uint8 TURN_RELATIVE=1
+uint8 TURN_HEADING=2
+uint8 DRIVE_DISTANCE=3
+uint8 mode
+# Radians for turns, metres for distance (negative permits reversing).
+# TURN_HEADING is in odom, shortest path; relative turns retain multiple revolutions.
+float64 target
+# False uses driver YAML defaults. True requires ALL fields below (except lease).
+bool use_custom_config
+float64 track_width
+float64 wheelbase
+float64 skid_compensation
+float64 max_linear_speed
+float64 max_angular_speed
+float64 heading_gain
+float64 yaw_rate_gain
+float64 angle_tolerance
+float64 distance_gain
+float64 distance_tolerance
+float64 timeout
+# 0: headless goal; 0.1..5 s: renew motion_keepalive with the returned goal_id.
+float64 client_timeout
+---
+# Acceptance only; final result is on motion_status.
+bool accepted
+uint64 goal_id
+string message

@@ -1,8 +1,10 @@
 # ROS 2 工程架构、通讯接口与数据结构
 
-本文于 2026-10-28 按当前工作树核对，面向上层应用、GUI 和底盘驱动的开发与接入。默认环境为 ROS 2 Jazzy，底盘为 MARK1_DIFF，驱动节点为 `/vehicle`。文中的名称、参数和 QoS 均指默认配置；namespace、remap 和自定义配置会改变实际接口。
+本文于 2026-11-06 按当前工作树核对，面向上层应用、GUI 和底盘驱动的开发与接入。默认环境为 ROS 2 Jazzy，底盘为 MARK1_DIFF，驱动节点为 `/vehicle`。文中的名称、参数和 QoS 均指默认配置；namespace、remap 和自定义配置会改变实际接口。
 
-当前工程有四个包、两个应用节点，提供 **15 个应用话题（含 `/tf`）和 2 个业务服务**，定义 10 种自定义消息和 1 种自定义服务，尚未实现 action。框架自动提供的参数、日志等接口另见下文。
+当前工程有四个包、三个应用节点，提供 **22 个应用话题（含 `/tf`）和 4 个业务服务**，定义 13 种自定义消息和 1 种自定义服务，尚未实现 action。框架自动提供的参数、日志等接口另见下文。
+
+新增 `/imu` 节点使用 can1 的 CAN-FD 数据。IMU 协议、安装变换、角度控制及新增消息字段见 [IMU 模块](imu.md)；底盘节点继续使用 can0。
 
 ## 1. 代码与文档入口
 
@@ -75,7 +77,14 @@ GUI 主线程处理 Qt，`RosWorker` 在线程中运行 rclpy `SingleThreadedExe
 | 代码中的名称 | 默认解析结果 | namespace 为 `robot1` 时 |
 |---|---|---|
 | `cmd_vel` | `/cmd_vel` | `/robot1/cmd_vel` |
-| `odom` | `/odom` | `/robot1/odom` |
+| `odom` | `/vehicle/imu_calibration` | `vehicle_interfaces/msg/ImuCalibration` | 发布 | R / TL / 1 | 10 Hz 及状态变化时；标定阶段、yaw 系数、正反转角差与自动指令 |
+| `/vehicle/heading` | `vehicle_interfaces/msg/Heading` | 发布 | R / V / 10 | 与 odom 同次发布，含 yaw、yaw_rate、imu_active、imu_age |
+| `/imu/data` | `sensor_msgs/msg/Imu` | IMU 发布 / 底盘订阅 | R / V / 10 | 有效 TPDO2 姿态或失效标记 |
+| `/imu/raw` | `sensor_msgs/msg/Imu` | IMU 发布 | BE / V / 5 | 新 TPDO1 惯性量 |
+| `/imu/magnetic_field` | `sensor_msgs/msg/MagneticField` | IMU 发布 | BE / V / 5 | TPDO1 有效磁场 |
+| `/imu/temperature` | `sensor_msgs/msg/Temperature` | IMU 发布 | BE / V / 5 | TPDO1 有效温度 |
+| `/imu/status` | `vehicle_interfaces/msg/ImuStatus` | IMU 发布 | R / V / 10 | 10 Hz 在线、有效性、计数、年龄与故障 |
+| `/odom` | `/robot1/odom` |
 | `diagnostics` | `/diagnostics` | `/robot1/diagnostics` |
 | `~/state` 等私有话题 | `/vehicle/state` | `/robot1/vehicle/state` |
 | `~/command`、`~/reset_odometry` | `/vehicle/command`、`/vehicle/reset_odometry` | `/robot1/vehicle/command`、`/robot1/vehicle/reset_odometry` |
@@ -105,6 +114,8 @@ GUI 主线程处理 Qt，`RosWorker` 在线程中运行 rclpy `SingleThreadedExe
 | 默认 topic | 消息类型 | 驱动方向 | QoS | 发布 / 触发时机 |
 |---|---|---|---|---|
 | `/cmd_vel` | `geometry_msgs/msg/TwistStamped`；可配置为 `Twist` | 订阅 | R / V / 1 | 上层持续更新速度；GUI 有效运动时约 20 Hz |
+| `/vehicle/motion_status` | `vehicle_interfaces/msg/MotionStatus` | 发布 | R / TL / 1 | 定角/定距目标、进度、剩余量、前馈倍率及结果，10 Hz 与状态切换时 |
+| `/vehicle/motion_keepalive` | `std_msgs/msg/UInt64` | 订阅 | R / V / 1 | 启用续期的客户端发送当前 goal_id |
 | `/vehicle/velocity` | `geometry_msgs/msg/TwistStamped` | 发布 | BE / V / 5 | B2 到达；实测约 20 ms 一帧 |
 | `/vehicle/state` | `vehicle_interfaces/msg/State` | 发布 | R / TL / 1 | B0 / B1 到达，以及每 500 ms |
 | `/vehicle/version` | `vehicle_interfaces/msg/Version` | 发布 | R / TL / 1 | 收到版本应答 A2 |
@@ -122,7 +133,7 @@ GUI 主线程处理 Qt，`RosWorker` 在线程中运行 rclpy `SingleThreadedExe
 
 CAN 实测周期是现有固件的观察结果，不是驱动承诺的固定 ROS 频率，详见[协议说明](protocol.md)。驱动不为缺失的 B4、B6 或 BA 构造模拟消息。
 
-GUI 当前发布 `/cmd_vel`，订阅 state、version、velocity、wheel_mileage、driver_motion、driver_status、faults、acknowledgements、can_rx、odom 和 diagnostics，并调用下文两个业务服务。它没有 remote、sensors 或 TF 的专用订阅。
+GUI 当前发布 `/cmd_vel` 和自动运动续期，订阅 state、version、velocity、wheel_mileage、driver_motion、driver_status、faults、acknowledgements、can_rx、odom、heading、imu_calibration、motion_status、imu/data、imu/status 和 diagnostics，并调用设备命令、里程计重置、IMU 标定/置零和自动运动服务。它没有 remote、sensors 或 TF 的专用订阅。
 
 ## 5. 速度输入与标准消息结构
 
@@ -147,7 +158,7 @@ GUI 当前发布 `/cmd_vel`，订阅 state、version、velocity、wheel_mileage�
 3. 独立定时器默认每 20 ms 发送一次 CAN 速度，固定 `vy=0`。ROS 发布频率和 CAN 发送频率不需要一一对应。
 4. 本地接收后默认 300 ms 没有新有效输入，则在控制定时器中发出一次零速并结束该旧命令的周期重发。设备另有此前实测约 500 ms 的断命令保护，属于不同层的超时机制。
 
-该接口表达持续更新的速度设定值，不提供目标完成通知。当前没有定距、定角或导航 action。
+该接口表达持续更新的速度设定值，不提供目标完成通知；任意输入会接管正在执行的定角/定距任务。定角/定距使用 `/vehicle/execute_motion` 服务和 `/vehicle/motion_status`，当前没有导航 action。
 
 ### 5.2 `/vehicle/velocity`：原始速度反馈
 
@@ -176,7 +187,7 @@ GUI 当前发布 `/cmd_vel`，订阅 state、version、velocity、wheel_mileage�
 | `pose.covariance` | `pose_variance_xy` | `pose_variance_xy` | `pose_variance_yaw` | 索引 14 / 21 / 28 为 `1e6` |
 | `twist.covariance` | `twist_variance_linear` | `1e6` | `twist_variance_angular` | 索引 14 / 21 / 28 为 `1e6` |
 
-`odom_source=velocity` 默认按 B2 的 `vx / wz` 做 SE(2) 圆弧积分；`wheel_mileage` 则只使用 B3 主轮累计值，需要已标定的 `effective_track_width>0`。首个反馈只建基线，间隔超过 250 ms 或轮里程异常增量时重建基线，保留位姿。协方差是配置估计，当前反馈和里程计精度不能等同于外部定位真值。
+`odom_source=velocity` 默认按 B2 的 `vx` 积分位移；IMU 有效时使用四元数航向增量，失效时回退 B2 的 wz，位置采用 SE(2) 圆弧积分；`wheel_mileage` 使用 B3 主轮累计值提供位移，IMU 缺失时使用轮差提供转向，需要已标定的 `effective_track_width>0`。首个反馈只建基线，间隔超过 250 ms 或轮里程异常增量时重建基线，保留位姿。协方差是配置估计，当前反馈和里程计精度不能等同于外部定位真值。
 
 ### 5.4 `/tf`：坐标变换
 
@@ -193,7 +204,7 @@ GUI 当前发布 `/cmd_vel`，订阅 state、version、velocity、wheel_mileage�
 
 ## 6. 自定义遥测消息结构
 
-本节覆盖 [vehicle_interfaces/msg](../src/vehicle_interfaces/msg/) 的全部 10 个消息文件。每种消息的 `header: std_msgs/Header` 均遵循第 3 节约定，下面列出其余所有字段。
+本节列出原有 10 个底盘消息。新增 IMU、标定和自动运动消息见 [IMU 与自动运动接口](imu.md)。每种消息的 `header: std_msgs/Header` 均遵循第 3 节约定。
 
 ### 6.1 `State`：整车状态
 
@@ -363,7 +374,7 @@ GUI 的接收表计数来自自己的 best-effort 订阅，不保证与驱动 `r
 
 ## 8. Service：业务服务及请求 / 响应结构
 
-两个业务服务使用 ROS 默认 service QoS（reliable / volatile），客户端应异步调用。`/vehicle/command` 默认等待反馈上限为 `service_timeout=1.2 s`；GUI 客户端最多等约 3 s，不自动重试。客户端取消等待不等于撤销已经发送的设备命令。
+四个业务服务使用 ROS 默认 service QoS（reliable / volatile），客户端应异步调用。`/vehicle/command` 默认等待反馈上限为 `service_timeout=1.2 s`；GUI 客户端最多等约 3 s，不自动重试。客户端取消等待不等于撤销已经发送的设备命令。
 
 ### 8.1 `/vehicle/command`
 
@@ -424,6 +435,16 @@ GUI 的接收表计数来自自己的 best-effort 订阅，不保证与驱动 `r
 
 此服务将 ROS 位姿和积分基线清零，不发送 CAN、不清设备累计里程或脉冲，也不清速度命令。服务回调不立即发布新的 odom / TF，后续有效反馈积分后才继续发布。GUI 收到成功响应后另清自己的旧轨迹。
 
+### 8.3 `/vehicle/calibrate_imu`
+
+类型为 `std_srvs/srv/Trigger`，请求无字段。响应 `success` 仅表示方向标定请求是否受理，`message` 说明原因；阶段和最终结果通过 `/vehicle/imu_calibration` 发布。详见 [自动方向标定](imu.md#启动自动方向标定)。
+
+### 8.4 `/imu/zero_orientation`
+
+类型为 `std_srvs/srv/Trigger`，请求无字段。IMU 节点以当前安装变换后的四元数设定三轴零点，响应 `success=true` 表示完成，`message` 说明结果；没有有效姿态或样本总年龄达到 250 ms 时返回 false，保留原零点。使用相对私有服务名 `~/zero_orientation`，如命名空间 `robot1` 下为 `/robot1/imu/zero_orientation`；GUI 客户端使用同命名空间的 `imu/zero_orientation`，更改节点名时需相应重映射。
+
+服务更新 `/imu/data` 的姿态参考，并通过失效标记通知增量积分订阅者重建基线。底盘里程计位姿和路径连续；不发送 IMU CAN 命令，零点不持久化。GUI 点击前结束当前运动控制。详见 [IMU 角度置零](imu.md#imu-角度置零)。
+
 ## 9. 参数与框架接口
 
 ### 9.1 驱动配置参数
@@ -448,6 +469,9 @@ GUI 的接收表计数来自自己的 best-effort 订阅，不保证与驱动 `r
 | `sensor_feedback` | bool | false | 初始化时发送的 B6 反馈开关 |
 | `driver_motion_feedback` | bool | true | 初始化时发送的 B7 反馈开关 |
 | `driver_status_feedback` | bool | true | 初始化时发送的 B8 反馈开关 |
+| `auto_imu_calibration` | bool | true | 就绪后自行原地正反转，测定 yaw 方向，每次启动一次 |
+| `imu_yaw_sign` | int | 1 | 手动初值 +1 / -1；实际生效系数见 imu_calibration 状态 |
+| `use_imu_heading` | bool | true | 使用有效 IMU 航向增量，缺失时回退底盘反馈 |
 | `odom_source` | string | `velocity` | 只接受 `velocity` 或 `wheel_mileage` |
 | `effective_track_width` | double | 0.0 | 有效轮距，m；轮里程模式必须为已标定的正有限值 |
 | `odom_frame` | string | `odom` | 里程计父坐标系，非空且与 base_frame 不同 |
@@ -461,6 +485,12 @@ GUI 的接收表计数来自自己的 best-effort 订阅，不保证与驱动 `r
 反馈参数用于初始化时的配置，之后通过 Command 修改反馈开关不会改写只读参数值。`can_interface` 也不意味着驱动会配置位率或网卡状态。
 
 GUI 业务参数只有 `driver_name: string = vehicle` 和 `use_stamped_cmd_vel: bool = true`，用于选择驱动接口路径与速度类型。GUI 的这些参数在构造时读取，运行中修改参数不会重新连接接口，应在启动时设置。
+
+IMU 节点可执行程序为 `imu_node`，组件类 `vehicle_driver::ImuNode`；参数 `imu_can_interface`、`imu_node_id`、`imu_auto_start`、`imu_mount_rpy` 和协方差见 [IMU 配置](imu.md#启动和配置)。`ImuStatus` 和 `Heading` 的精确字段分别见 [ImuStatus.msg](../src/vehicle_interfaces/msg/ImuStatus.msg)、[Heading.msg](../src/vehicle_interfaces/msg/Heading.msg)。自动标定和定角/定距任务由底盘驱动生成 CAN 速度命令；键盘保向仍由 GUI 生成 cmd_vel。
+
+定角/定距入口为 `/vehicle/execute_motion`，类型 [`vehicle_interfaces/srv/ExecuteMotion`](../src/vehicle_interfaces/srv/ExecuteMotion.srv)，请求 `mode=0/1/2/3` 表示取消/相对转角/路径航向/距离。`target` 使用 rad 或 m，返回受理结果和目标 ID；[`MotionStatus`](../src/vehicle_interfaces/msg/MotionStatus.msg) 给出最终结果。请求可使用驱动 `motion_*` 默认参数，或完整提供一次任务的几何/前馈/闭环参数；GUI 使用后者。无 GUI 的调用示例、参数单位、续期协议与取消规则见 [定角 / 定距 ROS 命令](imu.md#定角--定距-ros-命令)。
+
+自动 yaw 方向标定由底盘驱动执行，默认启动一次；参数与状态机见 [自动方向标定](imu.md#启动自动方向标定)。额外提供 `/vehicle/calibrate_imu`（`std_srvs/Trigger`）重新请求标定，响应 success 仅表示请求受理，最终结果通过 `/vehicle/imu_calibration` 发布。状态字段见 [ImuCalibration.msg](../src/vehicle_interfaces/msg/ImuCalibration.msg)。
 
 ### 9.2 框架自动提供的接口
 
@@ -479,7 +509,7 @@ GUI 业务参数只有 `driver_name: string = vehicle` 和 `use_stamped_cmd_vel:
 
 `Parameter` 由名称与 `ParameterValue` 组成；后者用类型码选择 bool、integer、double、string 或数组等值。`SetParametersResult` 包含 `successful` 和 `reason`。这些框架类型的完整字段以官方 [rcl_interfaces](https://github.com/ros2/rcl_interfaces/tree/jazzy/rcl_interfaces) 定义及 `ros2 interface show` 为准。
 
-GUI 对应服务位于 `/vehicle_gui/...`。若启用 `use_sim_time`，框架还会使用 `/clock`（`rosgraph_msgs/msg/Clock`，内含 `clock: builtin_interfaces/Time`）提供 ROS 时间；这不会替代驱动内部的单调时钟超时。框架生成的接口不在前述 15 个应用话题和 2 个业务服务的计数中。
+GUI 对应服务位于 `/vehicle_gui/...`。若启用 `use_sim_time`，框架还会使用 `/clock`（`rosgraph_msgs/msg/Clock`，内含 `clock: builtin_interfaces/Time`）提供 ROS 时间；这不会替代驱动内部的单调时钟超时。框架生成的接口不在前述 22 个应用话题和 4 个业务服务的计数中。
 
 ## 10. 驱动内部数据结构
 

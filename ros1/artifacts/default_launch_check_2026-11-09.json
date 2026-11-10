@@ -1,0 +1,9 @@
+{
+  "entry": "roslaunch vehicle_gui console.launch quit_after:=3",
+  "space": "install",
+  "exit_code": 0,
+  "default_receive_only_logged": true,
+  "chassis_tx_before": 0,
+  "chassis_tx_after": 0,
+  "chassis_tx_delta": 0
+}

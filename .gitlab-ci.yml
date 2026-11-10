@@ -23,3 +23,22 @@ verify:
         - build/vehicle_core/test_results/vehicle_core/*.xml
         - build/vehicle_driver/test_results/vehicle_driver/*.xml
         - build/vehicle_gui/pytest.xml
+
+verify_noetic:
+  image: ros:noetic-ros-base-focal
+  stage: verify
+  before_script:
+    - apt-get update -qq
+    - apt-get install -y -qq --no-install-recommends g++ cmake iproute2 libgtest-dev python3-pytest python3-pyqt5 python3-pyqtgraph python3-numpy python3-rosdep
+    - rosdep update --rosdistro noetic --include-eol-distros
+    - rosdep install --from-paths ros1/src --ignore-src --rosdistro noetic -y --skip-keys python3-pyqtgraph
+  script:
+    - bash ros1/tools/build.sh
+    - bash ros1/tools/test.sh --disable-warnings
+  artifacts:
+    when: always
+    paths: [ros1/test_results/, ros1/build/test_results/]
+    reports:
+      junit:
+        - ros1/build/test_results/vehicle_core/*.xml
+        - ros1/test_results/pytest.xml

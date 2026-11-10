@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>vehicle_driver</name><version>1.0.0</version>
+  <description>ROS1 Noetic MARK1 SocketCAN driver and HPM CAN-FD IMU.</description>
+  <maintainer email="207119930@qq.com">Luka</maintainer><license>Apache-2.0</license>
+  <buildtool_depend>catkin</buildtool_depend>
+  <depend>roscpp</depend><depend>vehicle_core</depend><depend>vehicle_interfaces</depend>
+  <depend>geometry_msgs</depend><depend>nav_msgs</depend><depend>sensor_msgs</depend>
+  <depend>std_msgs</depend><depend>std_srvs</depend><depend>diagnostic_msgs</depend>
+  <depend>tf2_ros</depend><exec_depend>roslaunch</exec_depend>
+  <test_depend>rospy</test_depend><test_depend>python3-pytest</test_depend>
+  <test_depend>python3-yaml</test_depend><test_depend>roslib</test_depend>
+</package>

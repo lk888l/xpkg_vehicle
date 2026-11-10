@@ -32,19 +32,40 @@ class VehicleViewModel(QObject):
         self.lease.stop()
         self._submit("reset_odometry")
 
+    def zero_imu(self):
+        self.lease.stop()
+        self._submit("zero_imu")
+
+    def calibrate_imu(self):
+        revision = self.lease.handoff()
+        if not self._submit("calibrate_imu", motion_revision=revision):
+            self.lease.stop(revision)
+
+    def execute_motion(self, **fields):
+        revision = self.lease.handoff()
+        if not self._submit("execute_motion", motion_revision=revision, **fields):
+            self.lease.stop(revision)
+            return None
+        return revision
+
     def _submit(self, kind, command=0, **fields):
         if not self.worker.isRunning():
             self.store.event("ROS 通信线程未运行，请重新启动控制台", "error")
-            return
+            return False
         if self.busy:
             self.store.event("正在等待上一条设备命令；停止运动仍可使用", "warning")
-            return
+            return False
         if self.worker.submit(kind, command, **fields):
             self.busy = True
             self.busy_changed.emit(True)
-            self.store.event("发送 · " + COMMAND_NAMES.get(command, "重置本地里程计"))
+            name = {"calibrate_imu": "IMU 方向标定", "zero_imu": "IMU 角度置零",
+                    "execute_motion": "自动运动"}.get(
+                kind, COMMAND_NAMES.get(command, "重置本地里程计"))
+            self.store.event("发送 · " + name)
+            return True
         else:
             self.store.event("命令队列已满，请稍后重试", "warning")
+            return False
 
     def _outcome(self, result):
         self.busy = False
@@ -63,4 +84,7 @@ class VehicleViewModel(QObject):
     def shutdown(self):
         self.lease.stop()
         self.worker.requestInterruption()
-        return self.worker.wait(1500)
+        finished = self.worker.wait(1500)
+        if finished:
+            self.store.stop_recording()
+        return finished

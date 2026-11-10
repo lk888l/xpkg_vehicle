@@ -1,0 +1,18 @@
+cmake_minimum_required(VERSION 3.10)
+project(vehicle_core VERSION 1.0.0 LANGUAGES CXX)
+find_package(catkin REQUIRED)
+catkin_package(INCLUDE_DIRS include LIBRARIES vehicle_core)
+add_library(vehicle_core SHARED src/protocol.cpp src/socketcan.cpp src/odometry.cpp
+  src/imu.cpp src/imu_socketcan.cpp src/yaw_calibration.cpp src/motion_controller.cpp)
+target_compile_features(vehicle_core PUBLIC cxx_std_17)
+target_include_directories(vehicle_core PUBLIC include ${catkin_INCLUDE_DIRS})
+target_compile_options(vehicle_core PRIVATE -Wall -Wextra -Wpedantic -Wconversion -Wshadow)
+install(TARGETS vehicle_core ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION})
+install(DIRECTORY include/ DESTINATION ${CATKIN_GLOBAL_INCLUDE_DESTINATION})
+if(CATKIN_ENABLE_TESTING)
+  catkin_add_gtest(test_core test/test_core.cpp)
+  if(TARGET test_core)
+    target_link_libraries(test_core vehicle_core gtest_main)
+  endif()
+endif()

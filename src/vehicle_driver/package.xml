@@ -7,6 +7,8 @@
   <depend>vehicle_core</depend><depend>vehicle_interfaces</depend>
   <depend>rclcpp</depend><depend>rclcpp_components</depend>
   <depend>geometry_msgs</depend><depend>nav_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>std_msgs</depend>
   <depend>std_srvs</depend><depend>diagnostic_msgs</depend><depend>tf2_ros</depend>
   <exec_depend>launch_ros</exec_depend><exec_depend>ament_index_python</exec_depend>
   <test_depend>ament_cmake_pytest</test_depend><test_depend>rclpy</test_depend>

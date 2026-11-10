@@ -1,0 +1,40 @@
+{
+  "remote_workspace": "orin@172.18.2.136:/home/orin/vehicle_noetic_ws",
+  "backup": "/home/orin/vehicle_noetic_ws/artifacts/optional_imu_backup_20261109_205617.tgz",
+  "build_and_install": "passed",
+  "core_tests": {
+    "tests": 34,
+    "failures": 0,
+    "errors": 0
+  },
+  "full_python_regression": {
+    "tests": 90,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "final_launch_tests": {
+    "tests": 12,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "launch_test_note": "10 overlap with full regression; 2 additional invalid-input tests",
+  "install_smoke": {
+    "package_path": "/home/orin/vehicle_noetic_ws/install/share/vehicle_driver",
+    "nodes": [
+      "/install_check/vehicle",
+      "/install_check/vehicle_gui"
+    ],
+    "exit_code": 0,
+    "chassis_policy_started": true,
+    "can0_tx_delta": 0,
+    "success": true
+  },
+  "real_chassis_readonly": "passed; zero CAN TX from startup through shutdown",
+  "real_chassis_feedback_ready_without_imu": true,
+  "real_chassis_motion_acceptance": "not passed; aborted before goals because zero-command velocity feedback exceeded stationary threshold",
+  "real_chassis_nonzero_motion_commands": 0,
+  "real_chassis_final_disabled_confirmed": true,
+  "real_imu_connected": false
+}

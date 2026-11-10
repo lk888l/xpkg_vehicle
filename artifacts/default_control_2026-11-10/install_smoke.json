@@ -1,0 +1,13 @@
+{
+  "exit_code": 0,
+  "default_control_started": true,
+  "chassis_heading_started": true,
+  "local_command_counts": {
+    "0x12": 1,
+    "0x3": 1
+  },
+  "nonzero_velocity_frames": [],
+  "enable_true_frames": [],
+  "shutdown_disable_sent": true,
+  "success": true
+}

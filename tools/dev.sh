@@ -15,14 +15,16 @@ case "$action" in
     ' _ "$container_path"
     ;;
   test)
-    docker exec "$container" bash -c 'cd -- "$1"; exec bash tools/test.sh' _ "$container_path"
+    docker exec --user 0:0 "$container" bash -c 'cd -- "$1"; exec bash tools/test.sh' _ "$container_path"
     ;;
   run)
+    shift
     docker exec -it "$container" bash -c '
       source /opt/ros/jazzy/setup.bash
       source "$1/install/setup.bash"
-      exec ros2 launch vehicle_driver vehicle.launch.py
-    ' _ "$container_path"
+      shift
+      exec ros2 launch vehicle_driver vehicle.launch.py "$@"
+    ' _ "$container_path" "$@"
     ;;
   gui-setup)
     docker exec "$container" bash -c 'cd -- "$1"; exec bash tools/install_gui_deps.sh' _ "$container_path"

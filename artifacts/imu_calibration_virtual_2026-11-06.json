@@ -1,0 +1,20 @@
+{
+  "simulation": true,
+  "interface": "vcan_cal_gui",
+  "launch": "vehicle_gui console.launch.py",
+  "configured_sensor_sign": -1,
+  "detected_yaw_sign": -1,
+  "positive_delta_rad": -0.1798350474475982,
+  "negative_delta_rad": 0.18583502944769542,
+  "final_raw_imu_yaw_rad": 0.006057804300144192,
+  "observed_states": [
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+  ],
+  "only_in_place_motion": true,
+  "launch_exit_code": 0
+}

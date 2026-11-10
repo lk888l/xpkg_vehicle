@@ -1,11 +1,15 @@
 # MARK1_DIFF · ROS 2 Jazzy · SocketCAN
 
+ROS1 Noetic 移植版位于 [ros1/](ros1/README.md)，包含完整驱动、IMU、运动算法和控制台；默认禁止底盘发送，适用于当前 Orin 软件验证阶段。
+
 针对已接入 `can0` 的 MARK1_DIFF 重写的 ROS 2 工作空间。仅继承旧工程的 CAN 命令与字段定义，结合实测修正协议；不依赖 `xpkg_comm`、`xpkg_msgs`、ROS 1、串口桥、JSON 控制或旧里程学。
 
 - 工作目录：`/home/kk/kk_data/ros2_project/vehicle_socketcan`
 - Git 分支：`refactor/socketcan-jazzy`，由 `main@f90f687` 创建 worktree。
 - 旧工程仍在 `../xpkg_vehicle` 的 `main` 分支。
 - 图形控制台：[PyQt5 使用说明](docs/gui.md)、[GUI 功能与 CAN 帧对照](docs/gui-can.md)，通过 ROS 2 操作及显示底盘。
+- IMU：[can1 接入、定角转向与路径记录](docs/imu.md)，使用 HPM IMU 的 CAN-FD 四元数修正航向，支持键盘直行保向和连续路径 CSV。
+- 自动运动：GUI 可设置转角、前进距离及控制参数；驱动提供 [定角/定距服务命令](docs/imu.md#定角--定距-ros-命令)。四轮滑移差速前馈默认轮距 535 mm、轴距 420 mm，滑移补偿系数可调。
 - 实机结果：[验收报告](docs/validation.md)、[原始统计](artifacts/hardware_acceptance_2026-10-27.json)。低速精度尚未通过验收。
 
 ## 构建与启动
@@ -16,7 +20,7 @@
 ./tools/dev.sh gui-setup  # 首次准备 GUI 依赖；已有时不会重复安装
 ./tools/dev.sh build
 ./tools/dev.sh test
-./tools/dev.sh gui        # 同时启动驱动与图形控制台
+./tools/dev.sh gui        # 同时启动底盘 can0、IMU can1 与图形控制台
 # 只运行驱动：./tools/dev.sh run
 # 驱动已运行：./tools/dev.sh gui start_driver:=false
 ```
@@ -32,7 +36,9 @@ source install/setup.bash
 ros2 launch vehicle_driver vehicle.launch.py can_interface:=can0
 ```
 
-启动后收到目标设备心跳，查询版本、使能一次；确认使能心跳后发送 CAN 模式及反馈配置一次。没有速度输入时不发送非零运动指令。退出时发送零速并默认失能。显式失能、切换模式后不会被后台循环改回；不自动复位、不自动清里程。
+IMU 默认节点号 31；can1 要求 1 Mbit/s 仲裁段、4 Mbit/s 数据段及 FD 开启，配置方法见 [IMU 说明](docs/imu.md)。`start_imu:=false` 可关闭 IMU 节点，`imu_can_interface:=can1` 可修改接口。没有 IMU 数据时仍能使用底盘里程计和普通手动控制。
+
+启动后收到目标设备心跳，查询版本、使能一次；确认使能心跳后发送 CAN 模式及反馈配置一次。默认启用 IMU 方向自动标定：底盘已使能且处于 CAN 模式、IMU 数据有效后，会以 0.30 rad/s 原地正转约 10°、再反转回位，自动确定 yaw 正负系数；每次启动只执行一次，结束后等待人工输入。键盘/零速命令随时取消。退出时发送零速并默认失能。显式失能、切换模式后不会被后台循环改回；不自动复位、不自动清里程。
 
 CAN 接口需由宿主机配置；本节点不修改位率、网卡状态或内核发送队列。当前 `can0` 已为 **500000 bit/s**，无需重复配置。新机器可按实际接口配置：
 
@@ -64,7 +70,14 @@ ros2 component load /ComponentManager vehicle_driver vehicle_driver::VehicleNode
 | 接口 | 类型 | 说明 / QoS |
 |---|---|---|
 | `/cmd_vel` | `geometry_msgs/msg/TwistStamped` | 输入，reliable / volatile / depth 1，只使用 `linear.x`、`angular.z` |
-| `/odom` | `nav_msgs/msg/Odometry` | reliable / depth 10，默认 B2 速度积分 |
+| `/odom` | `nav_msgs/msg/Odometry` | reliable / depth 10，默认 B2 位移 + 有效 IMU 航向增量；IMU 缺失则使用 B2 角速度 |
+| `/vehicle/imu_calibration` | `vehicle_interfaces/msg/ImuCalibration` | 自动方向标定阶段、实测角差与当前 yaw 系数；reliable / transient-local / 1 |
+| `/vehicle/calibrate_imu` | `std_srvs/srv/Trigger` | 手动重新请求方向标定，返回请求是否受理；完成结果见标定状态话题 |
+| `/vehicle/execute_motion` | `vehicle_interfaces/srv/ExecuteMotion` | 相对转角、路径航向、定距行驶或取消；角度 rad、距离 m |
+| `/vehicle/motion_status` | `vehicle_interfaces/msg/MotionStatus` | 目标 ID、进度、剩余量、完成/取消/失败及前馈倍率；reliable / transient-local / 1 |
+| `/vehicle/motion_keepalive` | `std_msgs/msg/UInt64` | 使用续期的控制端发送目标 ID；GUI 默认启用，CLI 可自主执行 |
+| `/vehicle/heading` | `vehicle_interfaces/msg/Heading` | 与 odom 同步的航向、IMU 来源和年龄 |
+| `/imu/data`、`/imu/raw`、`/imu/status` | `sensor_msgs/msg/Imu` / `vehicle_interfaces/msg/ImuStatus` | 片上姿态、原始惯性量和状态；完整话题见 [IMU 说明](docs/imu.md) |
 | `/tf` | TF | 默认 `odom → base_link`，可关闭 |
 | `/vehicle/velocity` | `geometry_msgs/msg/TwistStamped` | B2 原始速度换算，无平滑或死区 |
 | `/vehicle/state` | `vehicle_interfaces/msg/State` | reliable / transient-local / depth 1，含在线状态、独立心跳/状态时间戳及有效位 |
@@ -127,7 +140,7 @@ ros2 service call /vehicle/reset_odometry std_srvs/srv/Trigger '{}'
 
 参数集中于 [vehicle.yaml](src/vehicle_driver/config/vehicle.yaml)，启动后只读，改参数需重新启动。不会接受参数变更却继续使用旧值。
 
-默认 `odom_source: velocity`：B2 的 vx/wz 使用真实单调时钟接收间隔和 SE(2) 圆弧积分；没有测量时不外推，超过 250 ms 间隔重建基线。该里程计仍受设备低速反馈抖动影响。它不是独立定位真值。
+默认 `odom_source: velocity`：B2 的 vx 使用真实单调时钟接收间隔和 SE(2) 圆弧积分；IMU 有效时用相邻四元数航向差代替 B2 的 wz 积分，失效时回退到 B2。没有底盘测量时不外推，超过 250 ms 间隔重建基线。该里程计仍受设备低速反馈抖动、轮滑和相对航向漂移影响。它不是独立定位真值。
 
 需要基于 B3 累计里程计算时，设置 `odom_source: wheel_mileage` 和经过校准的 `effective_track_width`（米）。四轮滑移转向的有效轮距不应直接当成物理轮距。当前默认 0 表示未校准，因此不替用户猜测。B3 路径处理 int32 回绕、断连、A5 清零、明显计数跳变。A5 后只重建计数基线，保留 ROS 位姿连续；重置位姿另用服务。
 

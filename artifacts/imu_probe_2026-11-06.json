@@ -1,0 +1,16 @@
+{
+  "interface": "can1",
+  "arbitration_bitrate": 1000000,
+  "data_bitrate": 4000000,
+  "node_id": 31,
+  "valid_orientation_samples": 0,
+  "statuses": 49,
+  "online": false,
+  "measurement_valid": false,
+  "orientation_valid": false,
+  "nmt_state": 0,
+  "rx_frames": 0,
+  "malformed_frames": 0,
+  "error_frames": 0,
+  "message": "Waiting for fresh IMU orientation"
+}

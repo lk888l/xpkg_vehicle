@@ -24,16 +24,22 @@ def generate_launch_description():
     gui = Node(package="vehicle_gui", executable="vehicle_gui", name="vehicle_gui", namespace=namespace,
                output="screen", parameters=[{"use_stamped_cmd_vel": stamped}],
                arguments=["--quit-after", LaunchConfiguration("quit_after")])
+    imu = Node(package="vehicle_driver", executable="imu_node", name="imu", namespace=namespace,
+               output="screen", condition=IfCondition(LaunchConfiguration("start_imu")),
+               parameters=[LaunchConfiguration("config"), {
+                   "imu_can_interface": LaunchConfiguration("imu_can_interface")}])
     return LaunchDescription([
         DeclareLaunchArgument("can_interface", default_value="can0"),
+        DeclareLaunchArgument("imu_can_interface", default_value="can1"),
         DeclareLaunchArgument("quit_after", default_value="0", description="Close GUI after N seconds; 0 keeps it open"),
         DeclareLaunchArgument("namespace", default_value=""),
         DeclareLaunchArgument("start_driver", default_value="true"),
+        DeclareLaunchArgument("start_imu", default_value=LaunchConfiguration("start_driver")),
         DeclareLaunchArgument("auto_initialize", default_value="true"),
         DeclareLaunchArgument("use_stamped_cmd_vel", default_value="true"),
         DeclareLaunchArgument("config", default_value=PathJoinSubstitution([
             FindPackageShare("vehicle_driver"), "config", "vehicle.yaml"])),
         RegisterEventHandler(OnProcessExit(target_action=gui, on_exit=[
             EmitEvent(event=Shutdown(reason="Vehicle console closed"))])),
-        driver, gui,
+        driver, imu, gui,
     ])

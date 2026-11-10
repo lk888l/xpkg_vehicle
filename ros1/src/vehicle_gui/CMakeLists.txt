@@ -1,0 +1,7 @@
+cmake_minimum_required(VERSION 3.10)
+project(vehicle_gui)
+find_package(catkin REQUIRED COMPONENTS rospy vehicle_interfaces)
+catkin_python_setup()
+catkin_package(CATKIN_DEPENDS rospy vehicle_interfaces)
+catkin_install_python(PROGRAMS scripts/vehicle_gui DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
+install(DIRECTORY launch DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})

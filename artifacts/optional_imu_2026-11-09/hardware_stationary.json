@@ -1,0 +1,267 @@
+{
+  "utc": "2026-11-09T13:01:43.810558+00:00",
+  "interface": "can0",
+  "use_imu": false,
+  "requested_motion": "zero targets only",
+  "commands": [
+    {
+      "command": 2,
+      "sent": true,
+      "acknowledged": true,
+      "state_confirmed": true,
+      "message": "ASCII A2 version received"
+    },
+    {
+      "command": 3,
+      "enabled": true,
+      "sent": true,
+      "acknowledged": true,
+      "state_confirmed": true,
+      "message": "A3 received and new B0 enabled state matched"
+    },
+    {
+      "command": 17,
+      "mode": 2,
+      "beep": false,
+      "sent": true,
+      "acknowledged": false,
+      "state_confirmed": true,
+      "message": "New B1 mode/beep matched; brake and special-function effects remain unverified"
+    },
+    {
+      "command": 3,
+      "enabled": false,
+      "sent": true,
+      "acknowledged": true,
+      "state_confirmed": true,
+      "message": "A3 received and new B0 enabled state matched"
+    }
+  ],
+  "initial_enabled": false,
+  "version": [
+    "001v",
+    "001v"
+  ],
+  "original_mode": 2,
+  "last_velocity_samples": [
+    [
+      0.165,
+      -0.399
+    ],
+    [
+      0.012,
+      -0.03
+    ],
+    [
+      -0.053,
+      0.129
+    ],
+    [
+      0.026,
+      -0.062
+    ],
+    [
+      -0.113,
+      0.273
+    ],
+    [
+      0.058,
+      -0.141
+    ],
+    [
+      -0.217,
+      0.524
+    ],
+    [
+      0.117,
+      -0.283
+    ],
+    [
+      -0.363,
+      0.875
+    ],
+    [
+      0.217,
+      -0.524
+    ],
+    [
+      -0.506,
+      1.22
+    ],
+    [
+      0.37,
+      -0.891
+    ],
+    [
+      -0.456,
+      1.099
+    ],
+    [
+      0.503,
+      -1.213
+    ],
+    [
+      -0.083,
+      0.2
+    ],
+    [
+      0.439,
+      -1.059
+    ],
+    [
+      0.006,
+      -0.016
+    ],
+    [
+      0.044,
+      -0.108
+    ],
+    [
+      0.015,
+      -0.037
+    ],
+    [
+      -0.067,
+      0.162
+    ]
+  ],
+  "max_abs_velocity": 0.524,
+  "max_abs_yaw_rate": 1.264,
+  "ready_without_imu": true,
+  "driver_diagnostics": {
+    "heartbeat_age_s": "0.036189",
+    "status_age_s": "0.034083",
+    "velocity_age_s": "0.016184",
+    "rx_frames": "1983",
+    "tx_frames": "140",
+    "receive_only": "0",
+    "blocked_transmissions": "0",
+    "malformed_frames": "0",
+    "can_error_frames": "0",
+    "rx_errors": "0",
+    "tx_errors": "0",
+    "socket_dropped_frames": "0",
+    "rejected_commands": "0",
+    "command_active": "1",
+    "odometry_discontinuities": "0",
+    "imu_enabled": "0",
+    "motion_feedback_ready": "1",
+    "imu_heading_active": "0",
+    "imu_heading_age_s": "-1.000000",
+    "imu_yaw_sign": "1",
+    "imu_yaw_calibrated": "0",
+    "imu_calibration_state": "0"
+  },
+  "success": false,
+  "error": "Stationary feedback exceeds threshold; zero-goal tests skipped",
+  "final_disabled_confirmed": true,
+  "local_command_counts": {
+    "0x2": 1,
+    "0x12": 161,
+    "0x3": 3,
+    "0x11": 1
+  },
+  "nonzero_motion_frames": [],
+  "raw_b2_samples": [
+    [
+      12,
+      0,
+      -30
+    ],
+    [
+      -53,
+      0,
+      129
+    ],
+    [
+      26,
+      0,
+      -62
+    ],
+    [
+      -113,
+      0,
+      273
+    ],
+    [
+      58,
+      0,
+      -141
+    ],
+    [
+      -217,
+      0,
+      524
+    ],
+    [
+      117,
+      0,
+      -283
+    ],
+    [
+      -363,
+      0,
+      875
+    ],
+    [
+      217,
+      0,
+      -524
+    ],
+    [
+      -506,
+      0,
+      1220
+    ],
+    [
+      370,
+      0,
+      -891
+    ],
+    [
+      -456,
+      0,
+      1099
+    ],
+    [
+      503,
+      0,
+      -1213
+    ],
+    [
+      -83,
+      0,
+      200
+    ],
+    [
+      439,
+      0,
+      -1059
+    ],
+    [
+      6,
+      0,
+      -16
+    ],
+    [
+      44,
+      0,
+      -108
+    ],
+    [
+      15,
+      0,
+      -37
+    ],
+    [
+      -67,
+      0,
+      162
+    ],
+    [
+      33,
+      0,
+      -80
+    ]
+  ]
+}

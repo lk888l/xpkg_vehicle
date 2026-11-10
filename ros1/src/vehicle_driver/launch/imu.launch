@@ -1,0 +1,15 @@
+<launch>
+  <arg name="config" default="$(find vehicle_driver)/config/vehicle.yaml"/>
+  <arg name="namespace" default="/"/>
+  <arg name="imu_can_interface" default="can1"/>
+  <arg name="imu_node_id" default="31"/>
+  <arg name="imu_auto_start" default="true"/>
+  <group ns="$(arg namespace)">
+    <node pkg="vehicle_driver" type="imu_node" name="imu" output="screen">
+      <rosparam command="load" file="$(arg config)"/>
+      <param name="imu_can_interface" value="$(arg imu_can_interface)"/>
+      <param name="imu_node_id" value="$(arg imu_node_id)"/>
+      <param name="imu_auto_start" value="$(arg imu_auto_start)"/>
+    </node>
+  </group>
+</launch>

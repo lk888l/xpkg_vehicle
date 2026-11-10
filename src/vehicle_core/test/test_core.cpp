@@ -5,10 +5,129 @@
 #include <limits>
 #include <random>
 #include <vehicle_core/control.hpp>
+#include <vehicle_core/motion_controller.hpp>
 #include <vehicle_core/odometry.hpp>
 #include <vehicle_core/protocol.hpp>
 #include <vehicle_core/transport.hpp>
+#include <vehicle_core/imu.hpp>
+#include <vehicle_core/yaw_calibration.hpp>
 using namespace vehicle_core;
+TEST(MotionController, GeometryAndFeedbackAreBoundedAndDistinct) {
+  MotionConfig config;
+  config.max_angular_speed = 1;
+  EXPECT_NEAR(config.feedforward_gain(), 1.308149183334789, 1e-9);
+  MotionController c;
+  c.start(MotionController::Mode::RelativeTurn, 0.1, config, {}, 0);
+  const double initial = c.tick({}, .01, true)->yaw_rate;
+  EXPECT_GT(initial, config.heading_gain * .1);
+  Pose p; p.yaw_rate = .1;
+  EXPECT_LT(c.tick(p, .02, true)->yaw_rate, initial);
+  c.start(MotionController::Mode::RelativeTurn, 6, config, {}, 0);
+  EXPECT_DOUBLE_EQ(c.tick({}, .01, true)->yaw_rate, 1);
+  config.skid_compensation = 0;
+  EXPECT_DOUBLE_EQ(config.feedforward_gain(), 1);
+}
+
+TEST(MotionController, RelativeTurnsKeepDirectionAcrossWrapAndMultipleRevolutions) {
+  for (double target : {M_PI/2, -M_PI/2, 2*M_PI, -4*M_PI}) {
+    MotionConfig config; config.max_angular_speed = .7;
+    MotionController c;
+    Pose p; p.yaw = 179 * M_PI / 180;
+    double actual = p.yaw;
+    c.start(MotionController::Mode::RelativeTurn, target, config, p, 0);
+    for (int i = 1; i < 10000 && c.active(); ++i) {
+      auto command = c.tick(p, i*.02, true);
+      ASSERT_TRUE(command);
+      ASSERT_EQ(command->vx, 0);
+      ASSERT_LE(std::abs(command->yaw_rate), .7);
+      // Plant has slip and a first-order rate response, independent of controller gain.
+      p.yaw_rate += .2 * (command->yaw_rate / 1.4 - p.yaw_rate);
+      actual += p.yaw_rate*.02;
+      p.yaw = std::remainder(actual, 2*M_PI);
+    }
+    EXPECT_EQ(c.state(), MotionController::State::Succeeded);
+    EXPECT_NEAR(actual - 179*M_PI/180, target, config.angle_tolerance);
+    EXPECT_FALSE(c.tick(p, 201, true));
+  }
+}
+
+TEST(MotionController, AbsoluteHeadingTakesShortestPathAndMustSettle) {
+  MotionController c;
+  Pose p; p.yaw = 170*M_PI/180;
+  c.start(MotionController::Mode::Heading, -170*M_PI/180, {}, p, 0);
+  EXPECT_NEAR(c.target(), 20*M_PI/180, 1e-9);
+  EXPECT_GT(c.tick(p, .01, true)->yaw_rate, 0);
+  p.yaw = -170*M_PI/180; p.yaw_rate = .2;
+  EXPECT_EQ(c.tick(p, .1, true)->yaw_rate, 0);
+  EXPECT_EQ(c.tick(p, .5, true)->yaw_rate, 0);
+  EXPECT_TRUE(c.active());
+  p.yaw_rate = 0;
+  c.tick(p, .6, true); c.tick(p, .7, true);
+  EXPECT_TRUE(c.active());
+  c.tick(p, .81, true);
+  EXPECT_EQ(c.state(), MotionController::State::Succeeded);
+}
+
+TEST(MotionController, DistanceUsesStartHeadingProjectionAndConvergesInBothDirections) {
+  for (double target : {.5, -.5}) {
+    MotionController c;
+    Pose p; p.x = 2; p.y = 3; p.yaw = M_PI/3;
+    c.start(MotionController::Mode::Distance, target, {}, p, 0);
+    // Lateral displacement must not count as forward distance.
+    p.x -= .1*std::sin(M_PI/3); p.y += .1*std::cos(M_PI/3);
+    c.tick(p, .01, true);
+    EXPECT_NEAR(c.progress(), 0, 1e-12);
+    for (int i = 1; i < 2000 && c.active(); ++i) {
+      auto command = c.tick(p, i*.02, true);
+      ASSERT_TRUE(command);
+      p.vx += .3 * (command->vx - p.vx);
+      p.yaw_rate += .3 * (command->yaw_rate / 1.3 - p.yaw_rate);
+      p.yaw += p.yaw_rate*.02;
+      p.x += p.vx * std::cos(p.yaw)*.02; p.y += p.vx * std::sin(p.yaw)*.02;
+    }
+    EXPECT_EQ(c.state(), MotionController::State::Succeeded);
+    EXPECT_NEAR(c.progress(), target, .01);
+    EXPECT_EQ(c.command().vx, 0);
+  }
+}
+
+TEST(MotionController, TimeoutStaleFeedbackAndLeaseExpiryStopWithoutResuming) {
+  for (int failure = 0; failure < 3; ++failure) {
+    MotionController c;
+    MotionConfig config; config.timeout = 1;
+    c.start(MotionController::Mode::Distance, 1, config, {}, 0, failure == 2 ? .2 : 0);
+    ASSERT_GT(c.tick({}, .01, true)->vx, 0);
+    c.keepalive(.1);
+    const auto stopped = c.tick({}, failure == 0 ? 1.1 : .31, failure != 1);
+    ASSERT_TRUE(stopped); EXPECT_EQ(stopped->vx, 0); EXPECT_EQ(stopped->yaw_rate, 0);
+    EXPECT_EQ(c.state(), MotionController::State::Failed);
+    c.keepalive(1.2);
+    EXPECT_FALSE(c.tick({}, 1.3, true));
+  }
+  MotionController c;
+  c.start(MotionController::Mode::RelativeTurn, 1, {}, {}, 0, .2);
+  c.keepalive(.15);
+  EXPECT_GT(c.tick({}, .3, true)->yaw_rate, 0);
+  c.cancel("operator stop");
+  EXPECT_EQ(c.tick({}, .31, true)->yaw_rate, 0);
+  EXPECT_EQ(c.state(), MotionController::State::Canceled);
+}
+
+TEST(MotionController, RejectsInvalidGoalsWithoutReplacingRunningMotion) {
+  MotionController c;
+  c.start(MotionController::Mode::RelativeTurn, 1, {}, {}, 0);
+  for (double value : {0.0, -1.0, std::numeric_limits<double>::quiet_NaN(),
+                       std::numeric_limits<double>::infinity()}) {
+    MotionConfig config; config.track_width = value;
+    EXPECT_THROW(c.start(MotionController::Mode::Distance, 1, config, {}, 1), std::invalid_argument);
+  }
+  EXPECT_THROW(c.start(MotionController::Mode::Distance, NAN, {}, {}, 0), std::invalid_argument);
+  EXPECT_THROW(c.start(MotionController::Mode::Distance, 101, {}, {}, 0), std::invalid_argument);
+  EXPECT_THROW(c.start(MotionController::Mode::Distance, 1, {}, {}, 0, -.1), std::invalid_argument);
+  EXPECT_EQ(c.mode(), MotionController::Mode::RelativeTurn);
+  EXPECT_TRUE(c.active());
+}
+
 namespace {
 Frame frame(uint8_t function, std::initializer_list<uint8_t> payload) {
   Frame f;
@@ -219,4 +338,158 @@ TEST(Odometry, DifferentialTurnAndDiscontinuity) {
 }
 TEST(Transport, MissingInterfaceIsActionable) {
   EXPECT_THROW(SocketCan("absent_can_42"), std::system_error);
+}
+namespace {
+ImuFrame imu_frame(uint32_t id) {
+  ImuFrame f; f.id = id; f.size = 32; f.fd = f.brs = true; return f;
+}
+void put16(ImuFrame& f, size_t at, int value) {
+  const auto v = static_cast<uint16_t>(value);
+  f.data[at] = static_cast<uint8_t>(v); f.data[at + 1] = static_cast<uint8_t>(v >> 8);
+}
+}
+TEST(Imu, FirmwarePdoUnitsSignedFieldsAndMappingIsolation) {
+  auto f = imu_frame(0x19F);
+  put16(f, 0, -1000); put16(f, 4, 1000); put16(f, 6, 900); put16(f, 12, -123);
+  put16(f, 18, 2567); f.data[20] = 42; f.data[24] = 3; f.data[25] = 2;
+  const auto m = decode_imu_measurement(f, 31);
+  ASSERT_TRUE(m);
+  EXPECT_DOUBLE_EQ(m->acceleration[0], -9.80665);
+  EXPECT_DOUBLE_EQ(m->acceleration[2], 9.80665);
+  EXPECT_NEAR(m->angular_velocity[0], std::acos(-1.0)/2, 1e-12);
+  EXPECT_NEAR(m->magnetic_field[0], -123e-7, 1e-15);
+  EXPECT_DOUBLE_EQ(m->temperature, 25.67);
+  EXPECT_EQ(m->counter, 42U); EXPECT_EQ(m->faults, 2U);
+  EXPECT_FALSE(decode_imu_measurement(f, 30));
+  f.extended = true; EXPECT_FALSE(decode_imu_measurement(f, 31)); f.extended = false;
+  f.fd = false; EXPECT_FALSE(decode_imu_measurement(f, 31)); f.fd = true;
+  f.data[31] = 1; EXPECT_FALSE(decode_imu_measurement(f, 31)); f.data[31] = 0;
+  for (uint8_t n = 0; n < 32; ++n) { f.size = n; EXPECT_FALSE(decode_imu_measurement(f, 31)); }
+}
+TEST(Imu, QuaternionFreshnessNormalizationAndMounting) {
+  auto f = imu_frame(0x29F);
+  put16(f, 0, 7071); put16(f, 6, 7071); f.data[28] = 1;
+  auto q = decode_imu_orientation(f, 31);
+  ASSERT_TRUE(q && q->valid);
+  EXPECT_NEAR(quaternion_yaw(q->quaternion), std::acos(-1.0)/2, 1e-12);
+  auto mounting = mounting_rotation(0, 0, std::acos(-1.0)/2);
+  EXPECT_NEAR(quaternion_yaw(multiply(q->quaternion, conjugate(mounting))), 0, 1e-12);
+  const auto v = rotate(mounting, {1, 0, 0});
+  EXPECT_NEAR(v[0], 0, 1e-12); EXPECT_NEAR(v[1], 1, 1e-12);
+  f.data[24] = 250; EXPECT_FALSE(decode_imu_orientation(f, 31)->valid);
+  f.data[24] = 0; f.data[28] = 0; EXPECT_FALSE(decode_imu_orientation(f, 31)->valid);
+  f.data[28] = 1; put16(f, 0, 0); put16(f, 6, 0); EXPECT_FALSE(decode_imu_orientation(f, 31)->valid);
+}
+TEST(Imu, DuplicateCountersExpireWrapIsContinuousAndRebootsAreDetected) {
+  ImuCounter counter;
+  EXPECT_TRUE(counter.update(0xFFFFFFFFU, 1));
+  EXPECT_TRUE(counter.update(0, 1.01)); EXPECT_FALSE(counter.restarted());
+  EXPECT_FALSE(counter.update(0, 1.24)); EXPECT_FALSE(counter.fresh(1.27, 0.25));
+  EXPECT_TRUE(counter.update(100, 1.3));
+  EXPECT_TRUE(counter.update(1, 1.31)); EXPECT_TRUE(counter.restarted());
+  EXPECT_FALSE(counter.fresh(1.2, 0.25));
+  counter.reset(); EXPECT_FALSE(counter.fresh(1.32, 0.25));
+}
+TEST(Odometry, ImuReplacesWheelYawAndShapesTranslationArc) {
+  Odometry odom;
+  odom.set_heading(2.0, 0); odom.update(Motion{}, 0);
+  odom.update(Motion{1, 0, 0}, 0.1);  // Align IMU reference to odom without a jump.
+  odom.set_heading(2.0 + std::acos(-1.0)/2, 0.2);
+  odom.update(Motion{1, 0, -1}, 0.2);
+  EXPECT_NEAR(odom.pose().yaw, std::acos(-1.0)/2, 1e-12);
+  EXPECT_NEAR(odom.pose().x, 0.1 + 0.2/std::acos(-1.0), 1e-12);
+  EXPECT_NEAR(odom.pose().y, 0.2/std::acos(-1.0), 1e-12);
+}
+TEST(Odometry, ImuWrapFallbackRecoveryAndResetRemainContinuous) {
+  Odometry odom(0.5);
+  odom.set_heading(3.13, 0); odom.update(Mileage{}, 0); odom.update(Mileage{}, 0.1);
+  odom.set_heading(-3.13, 0.2); odom.update(Mileage{}, 0.2);
+  EXPECT_NEAR(odom.pose().yaw, 2*std::acos(-1.0)-6.26, 1e-12);
+  const double yaw = odom.pose().yaw;
+  odom.invalidate_heading();
+  odom.update(Mileage{-25, 25, false}, 0.3);
+  EXPECT_NEAR(odom.pose().yaw, yaw + 0.1, 1e-12);
+  odom.set_heading(1.2, 0.4); odom.update(Mileage{-25, 25, false}, 0.4);
+  EXPECT_NEAR(odom.pose().yaw, yaw + 0.1, 1e-12);
+  odom.reset(); odom.update(Mileage{-25, 25, false}, 0.5);
+  odom.set_heading(1.2, 0.6); odom.update(Mileage{-25, 25, false}, 0.6);
+  EXPECT_DOUBLE_EQ(odom.pose().yaw, 0); EXPECT_DOUBLE_EQ(odom.pose().x, 0);
+  odom.update(Mileage{-50, 50, false}, 0.8); // Last IMU sample still fresh.
+  odom.update(Mileage{-75, 75, false}, 0.9); // Stale: resume wheel yaw.
+  EXPECT_NEAR(odom.pose().yaw, 0.1, 1e-12);
+}
+TEST(YawCalibration, StartupIdentifiesBothSignsAcrossWrapAndReturnsNearStart) {
+  for (int sign : {-1, 1}) {
+    YawCalibration c;
+    c.request();
+    double yaw = 3.12, command = 0;
+    bool saw_positive = false, saw_negative = false;
+    for (int i = 0; i < 600 && c.pending(); ++i) {
+      const double time = i * 0.02;
+      yaw += sign * command * 0.02;
+      c.observe(std::remainder(yaw, 2 * std::acos(-1.0)), time);
+      command = c.tick(time, true).value_or(0);
+      saw_positive |= command > 0;
+      saw_negative |= command < 0;
+    }
+    EXPECT_TRUE(saw_positive); EXPECT_TRUE(saw_negative);
+    EXPECT_EQ(c.state(), YawCalibration::State::Succeeded);
+    EXPECT_EQ(c.sign(), sign);
+    EXPECT_LT(c.positive_delta() * c.negative_delta(), 0);
+    EXPECT_NEAR(yaw, 3.12, 0.012);
+    EXPECT_DOUBLE_EQ(command, 0);
+    EXPECT_FALSE(c.tick(20, true));  // A completed calibration never restarts itself.
+  }
+}
+TEST(YawCalibration, MissingDataWaitsAndStalledMotionFailsWithStop) {
+  YawCalibration c;
+  c.request();
+  EXPECT_FALSE(c.tick(1, true));
+  c.observe(0, 1);
+  EXPECT_FALSE(c.tick(1, false));
+  for (int i = 0; i < 300 && c.pending(); ++i) {
+    const double t = 2 + i * .02;
+    c.observe(0, t);  // New samples, but no physical rotation.
+    const auto command = c.tick(t, true);
+    ASSERT_TRUE(command);
+    if (!c.pending()) EXPECT_DOUBLE_EQ(*command, 0);
+  }
+  EXPECT_EQ(c.state(), YawCalibration::State::Failed);
+  EXPECT_FALSE(c.tick(20, true));
+}
+TEST(YawCalibration, ImuGapInvalidationAndManualCancelProduceOneStop) {
+  for (int failure = 0; failure < 3; ++failure) {
+    YawCalibration c;
+    c.request(); c.observe(0, 1); c.tick(1, true);
+    c.observe(0, 1.4);  // The data gap itself aborts an active run.
+    EXPECT_EQ(c.state(), YawCalibration::State::Failed);
+    EXPECT_DOUBLE_EQ(*c.tick(1.4, true), 0);
+    EXPECT_FALSE(c.tick(1.41, true));
+    c.request(); c.observe(0, 2); c.tick(2, true);
+    c.observe(0, 2.2); c.tick(2.2, true);
+    c.observe(0, 2.31); ASSERT_GT(*c.tick(2.31, true), 0);
+    if (failure == 0) c.invalidate();
+    if (failure == 1) c.cancel("manual takeover");
+    if (failure == 2) c.fail("CAN disconnected");
+    EXPECT_DOUBLE_EQ(*c.tick(2.32, true), 0);
+    EXPECT_FALSE(c.tick(2.33, true));
+    EXPECT_FALSE(c.pending());
+  }
+}
+TEST(YawCalibration, RejectsSameDirectionInBothLegsAndInvalidConfiguration) {
+  YawCalibration c;
+  c.request();
+  double yaw = 0, command = 0;
+  for (int i = 0; i < 600 && c.pending(); ++i) {
+    yaw += std::abs(command) * .02;  // A broken direction response, not a valid sign flip.
+    c.observe(yaw, i*.02);
+    command = c.tick(i*.02, true).value_or(0);
+  }
+  EXPECT_EQ(c.state(), YawCalibration::State::Failed);
+  EXPECT_DOUBLE_EQ(command, 0);
+  YawCalibrationConfig config;
+  config.angle = .01;
+  EXPECT_THROW(YawCalibration{config}, std::invalid_argument);
+  config.angle = .2; config.speed = NAN;
+  EXPECT_THROW(YawCalibration{config}, std::invalid_argument);
 }

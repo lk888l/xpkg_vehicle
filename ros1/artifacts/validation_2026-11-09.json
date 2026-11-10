@@ -1,0 +1,93 @@
+{
+  "target": "orin@172.18.2.136",
+  "workspace": "/home/orin/vehicle_noetic_ws",
+  "date": "2026-11-09",
+  "core": {
+    "tests": 32,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "time": 0.009
+  },
+  "python": {
+    "tests": 63,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "time": 100.582
+  },
+  "all_passed": true,
+  "total_tests": 95,
+  "physical": {
+    "utc": "2026-11-09T11:04:01.782677+00:00",
+    "host": "orin-desktop",
+    "architecture": "aarch64",
+    "ros_distro": "noetic",
+    "can_interface": "can0",
+    "imu_interface": "can1",
+    "chassis_before": {
+      "tx_packets": 0,
+      "rx_packets": 0,
+      "tx_errors": 0,
+      "rx_errors": 0
+    },
+    "receive_only": true,
+    "gui_exit_code": 0,
+    "gui_screenshot_created": true,
+    "receive_only_parameter": true,
+    "vehicle_state_messages": 13,
+    "vehicle_online": false,
+    "imu_status_messages": 67,
+    "imu_online": false,
+    "imu_measurement_valid": false,
+    "imu_orientation_valid": false,
+    "imu_status_message": "Waiting for fresh IMU orientation",
+    "imu_valid_orientation_samples": 0,
+    "imu_orientation_hz": 0,
+    "imu_zero_success": false,
+    "imu_zero_message": "No fresh valid IMU orientation; zero reference unchanged",
+    "driver_diagnostics": {
+      "heartbeat_age_s": "-1.000000",
+      "status_age_s": "-1.000000",
+      "velocity_age_s": "-1.000000",
+      "rx_frames": "0",
+      "tx_frames": "0",
+      "receive_only": "1",
+      "blocked_transmissions": "0",
+      "malformed_frames": "0",
+      "can_error_frames": "0",
+      "rx_errors": "0",
+      "tx_errors": "0",
+      "socket_dropped_frames": "0",
+      "rejected_commands": "1",
+      "command_active": "0",
+      "odometry_discontinuities": "0",
+      "imu_heading_active": "0",
+      "imu_heading_age_s": "-1.000000",
+      "imu_yaw_sign": "1",
+      "imu_yaw_calibrated": "0",
+      "imu_calibration_state": "0"
+    },
+    "nodes_running": true,
+    "chassis_after_shutdown": {
+      "tx_packets": 0,
+      "rx_packets": 0,
+      "tx_errors": 0,
+      "rx_errors": 0
+    },
+    "chassis_tx_delta": 0,
+    "chassis_rx_delta": 0,
+    "chassis_tx_zero": true,
+    "elapsed_seconds": 10.733304466999925
+  },
+  "install_space_verified": true,
+  "default_launch": {
+    "entry": "roslaunch vehicle_gui console.launch quit_after:=3",
+    "space": "install",
+    "exit_code": 0,
+    "default_receive_only_logged": true,
+    "chassis_tx_before": 0,
+    "chassis_tx_after": 0,
+    "chassis_tx_delta": 0
+  }
+}

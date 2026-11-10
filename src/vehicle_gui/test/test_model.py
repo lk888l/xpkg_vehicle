@@ -23,6 +23,49 @@ def test_invalid_input_and_clock_reversal_do_not_keep_motion_alive():
     assert lease.sample(19) == (0, 0)
 
 
+def test_calibration_handoff_removes_old_motion_but_preserves_new_operator_input():
+    lease = MotionLease()
+    lease.renew(.1, .2, now=10)
+    lease.stop()
+    revision = lease.handoff()
+    assert lease.sample(10.1) is None  # No trailing zero to cancel the new calibration.
+    assert lease.is_current(revision)
+    lease.stop()
+    assert not lease.is_current(revision)
+    assert lease.sample(10.2) == (0, 0)
+    revision = lease.handoff()
+    lease.renew(.1, -.2, now=11)
+    assert not lease.is_current(revision)
+    assert not lease.stop(revision)  # A failed old request must not stop newer manual input.
+    assert lease.sample(11.1) == (.1, -.2)
+
+
+def test_calibration_acceptance_is_not_reported_as_completion():
+    result = dict(kind="calibrate_imu", sent=True, request_accepted=True, state_confirmed=False)
+    level, text = describe_result(result)
+    assert level == "info" and "请求已受理" in text and "标定完成" not in text
+    rejected = dict(result, request_accepted=False, message="use_imu_heading is disabled")
+    assert describe_result(rejected)[0] == "warning"
+    assert "use_imu_heading is disabled" in describe_result(rejected)[1]
+    assert "取消" in describe_result(dict(result, superseded=True))[1]
+
+
+def test_goal_keepalive_expires_and_cannot_revive_after_operator_override():
+    lease = MotionLease()
+    revision = lease.handoff()
+    assert lease.keepalive(revision, now=10)
+    assert lease.fresh(revision, now=10.1)
+    assert not lease.fresh(revision, now=10.3)
+    assert lease.sample(10.1) is None  # Renewal must never publish cmd_vel over a goal.
+    lease.stop()
+    assert not lease.keepalive(revision, now=11)
+    assert not lease.fresh(revision, now=11)
+    assert lease.sample(11) == (0, 0)
+    result = dict(kind="execute_motion", sent=True, request_accepted=True)
+    assert "请求已受理" in describe_result(result)[1]
+    assert "取消" in describe_result(dict(result, superseded=True))[1]
+
+
 def test_cached_transient_state_is_not_falsely_online():
     assert connection_state(None, now=10) == ("等待设备", False)
     sample = Sample({"online": True, "heartbeat_age": 0.1}, 10)
