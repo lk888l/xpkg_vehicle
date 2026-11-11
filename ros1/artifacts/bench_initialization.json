@@ -1,0 +1,115 @@
+{
+  "utc": "2026-11-09T12:34:50.578030+00:00",
+  "interface": "can0",
+  "motion_requested": false,
+  "commands": [
+    {
+      "sent": true,
+      "acknowledged": true,
+      "state_confirmed": true,
+      "message": "ASCII A2 version received",
+      "hardware_version": "001v",
+      "software_version": "001v",
+      "command": 2,
+      "request": {}
+    },
+    {
+      "sent": true,
+      "acknowledged": true,
+      "state_confirmed": true,
+      "message": "A3 received and new B0 enabled state matched",
+      "hardware_version": "",
+      "software_version": "",
+      "command": 3,
+      "request": {
+        "enabled": true
+      }
+    },
+    {
+      "sent": true,
+      "acknowledged": false,
+      "state_confirmed": true,
+      "message": "New B1 mode/beep matched; brake and special-function effects remain unverified",
+      "hardware_version": "",
+      "software_version": "",
+      "command": 17,
+      "request": {
+        "mode": 2
+      }
+    },
+    {
+      "sent": true,
+      "acknowledged": false,
+      "state_confirmed": false,
+      "message": "Feedback switch sent; protocol has no ACK for this command; inspect telemetry",
+      "hardware_version": "",
+      "software_version": "",
+      "command": 23,
+      "request": {
+        "enabled": true
+      }
+    },
+    {
+      "sent": true,
+      "acknowledged": false,
+      "state_confirmed": false,
+      "message": "Feedback switch sent; protocol has no ACK for this command; inspect telemetry",
+      "hardware_version": "",
+      "software_version": "",
+      "command": 24,
+      "request": {
+        "enabled": true
+      }
+    },
+    {
+      "sent": true,
+      "acknowledged": true,
+      "state_confirmed": true,
+      "message": "A3 received and new B0 enabled state matched",
+      "hardware_version": "",
+      "software_version": "",
+      "command": 3,
+      "request": {
+        "enabled": false
+      }
+    }
+  ],
+  "phases": [],
+  "completed": true,
+  "battery_voltage": 26.5,
+  "ready": true,
+  "disable_confirmed": true,
+  "final_enabled": false,
+  "final_wheels": {
+    "0": 0,
+    "1": 0,
+    "2": 0,
+    "3": 0
+  },
+  "imu_valid": false,
+  "telemetry_counts": {
+    "state": 16,
+    "velocity": 40,
+    "driver_motion": 48,
+    "driver_status": 44,
+    "odometry": 39
+  },
+  "can_frame_counts": {
+    "0x81e101b0": 12,
+    "0x81e10102": 1,
+    "0x81e101a2": 1,
+    "0x81e10103": 3,
+    "0x81e101a3": 3,
+    "0x81e101b3": 42,
+    "0x81e101b4": 42,
+    "0x81e101b2": 40,
+    "0x81e101b1": 8,
+    "0x81e101ba": 1,
+    "0x81e10112": 17,
+    "0x81e10111": 1,
+    "0x81e10117": 1,
+    "0x81e10118": 1,
+    "0x81e101b7": 48,
+    "0x81e101b8": 44
+  }
+}

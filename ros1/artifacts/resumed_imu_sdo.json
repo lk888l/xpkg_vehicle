@@ -1,0 +1,12 @@
+[
+  {
+    "index": "0x1000",
+    "read_only_sdo": true,
+    "responses": []
+  },
+  {
+    "index": "0x1017",
+    "read_only_sdo": true,
+    "responses": []
+  }
+]

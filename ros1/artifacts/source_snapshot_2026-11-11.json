@@ -1,0 +1,653 @@
+{
+  "schema_version": 1,
+  "captured_at_utc": "2026-11-11T03:10:40.037010+00:00",
+  "source": {
+    "ssh": "orin@172.18.7.207",
+    "workspace": "/home/orin/vehicle_noetic_ws",
+    "resolved_workspace": "/home/orin/robotics/dependencies/vehicle_noetic_ws",
+    "git_revision": null
+  },
+  "included_roots": [
+    ".gitignore",
+    "COLCON_IGNORE",
+    "LICENSE",
+    "NOTICE",
+    "README.md",
+    "src",
+    "tools",
+    "docs",
+    "test",
+    "artifacts"
+  ],
+  "excluded": [
+    "build/",
+    "devel/",
+    "install/",
+    "test_results/",
+    "log/",
+    "logs/",
+    ".catkin_workspace",
+    "__pycache__/",
+    ".pytest_cache/",
+    "*.pyc",
+    "*.pyo",
+    "*.log",
+    "*.tgz"
+  ],
+  "files": {
+    ".gitignore": {
+      "sha256": "55ca0ddf32233d174634004e5bea19bfbf21e116fb514f039db9c595610213e0",
+      "size": 55,
+      "mode": "0664"
+    },
+    "COLCON_IGNORE": {
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+      "size": 1,
+      "mode": "0664"
+    },
+    "LICENSE": {
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "size": 11358,
+      "mode": "0664"
+    },
+    "NOTICE": {
+      "sha256": "46f5cf984ad8622f15c26aa8c00e560a2f8349c436474d0abe459f940801b8a2",
+      "size": 339,
+      "mode": "0664"
+    },
+    "README.md": {
+      "sha256": "1a37e622afd20809ee612164803dcf8652a48e63e1a01c3061d3c7248d2c4752",
+      "size": 12980,
+      "mode": "0664"
+    },
+    "artifacts/bench_initialization.frames.json": {
+      "sha256": "b033a37918aad8b370da3d45f22568be949bd647e51aff0d607be3af1b65d76d",
+      "size": 14180,
+      "mode": "0664"
+    },
+    "artifacts/bench_initialization.json": {
+      "sha256": "98d5bca136ab661688cdfc22c5f3a36d8e64ad27c553cffcc409f747d1740ea3",
+      "size": 2645,
+      "mode": "0664"
+    },
+    "artifacts/bench_motion.frames.json": {
+      "sha256": "4631b565c2dcdc4c2c77adcd2d4e8b312e9b81ccdac2340be71bfa4ffde6bc24",
+      "size": 325029,
+      "mode": "0664"
+    },
+    "artifacts/bench_motion.json": {
+      "sha256": "74c63ef71ad5cc03d57f3307b96e2e1281c6f129515f8d07d93fe6a76b9b3780",
+      "size": 23274,
+      "mode": "0664"
+    },
+    "artifacts/default_control_bench_2026-11-10.frames.json": {
+      "sha256": "c88d65649405af58a7a954149ba22318167b46c647baff26a0ffb328bc05f6d0",
+      "size": 310985,
+      "mode": "0664"
+    },
+    "artifacts/default_control_bench_2026-11-10.json": {
+      "sha256": "5f83d14821013e7d9ff83cc1a39bf87076ef696a1d5a943df222eadf40930960",
+      "size": 23486,
+      "mode": "0664"
+    },
+    "artifacts/default_control_install_smoke_2026-11-10.json": {
+      "sha256": "d49f2e65885f4e4a05ebf1d0b626949f7119bd007c7ce4813a6aaa0106194cdc",
+      "size": 265,
+      "mode": "0664"
+    },
+    "artifacts/default_control_manifest_2026-11-10.json": {
+      "sha256": "20f4f77b8d1933bc6c4960bc8c0cd97f26d43eccc4f50d989b206b61102b8014",
+      "size": 2810,
+      "mode": "0664"
+    },
+    "artifacts/default_control_source_2026-11-10.patch": {
+      "sha256": "4a1bdc84f9085195700f75ade71d37848ea228e3cd22836a94543e13257ff960",
+      "size": 25433,
+      "mode": "0664"
+    },
+    "artifacts/default_control_validation_2026-11-10.json": {
+      "sha256": "40f4603216b6c822b9b23d1304e9393feee2263719f00135c646d08ce362166a",
+      "size": 2509,
+      "mode": "0664"
+    },
+    "artifacts/default_launch_check_2026-11-09.json": {
+      "sha256": "5908667eb4174556f902af3fa001fe5ec2e868de97d3e357259a93771b45b61f",
+      "size": 223,
+      "mode": "0664"
+    },
+    "artifacts/noetic_console_2026-11-09.png": {
+      "sha256": "9cf6b0a03be7b9946cfbb4592fb545ebc987fbb9f5a7c8183bdc8a66bf527605",
+      "size": 119054,
+      "mode": "0664"
+    },
+    "artifacts/noetic_core_2026-11-09.xml": {
+      "sha256": "2fe47d5a331f4baabbf4bbf0d7480602b0434bc9cdd5c88a93bddadc7e9f025c",
+      "size": 6280,
+      "mode": "0644"
+    },
+    "artifacts/noetic_pytest_2026-11-09.xml": {
+      "sha256": "11efd1a1e0c8e49d398cb7f66074f2500658be1c9640c14ac7b5d414718a8cf2",
+      "size": 13478,
+      "mode": "0644"
+    },
+    "artifacts/optional_imu_console.png": {
+      "sha256": "2c0657ea61e186c4bc676730bb6279420312e7a9c9f23fd1507e9dae00ce9cd9",
+      "size": 121161,
+      "mode": "0664"
+    },
+    "artifacts/optional_imu_hardware_readonly.json": {
+      "sha256": "b05baba0dbf476d3ce42285fede59dfd0cce98fae437982db0abe747872d3aeb",
+      "size": 1904,
+      "mode": "0664"
+    },
+    "artifacts/optional_imu_hardware_stationary.json": {
+      "sha256": "c572b2ced878fef9e44c9b760cbb9e2c1597fe9be88875d291780b41d0de827e",
+      "size": 3784,
+      "mode": "0664"
+    },
+    "artifacts/optional_imu_hardware_stationary_initial.json": {
+      "sha256": "df04d38418d0bcd455e66a98480d331140c9b8979215ce005f93df7bdbd4f88c",
+      "size": 1270,
+      "mode": "0664"
+    },
+    "artifacts/optional_imu_install_smoke.json": {
+      "sha256": "71f19da95a735a7776f97647c9dc9fb0f8313f89247f2c456c68fac0188a1128",
+      "size": 256,
+      "mode": "0664"
+    },
+    "artifacts/optional_imu_launch_tests.xml": {
+      "sha256": "63ba78d6949ec55935591d649b1e996e013db7d5741ccf58c040f1ea5b067331",
+      "size": 3114,
+      "mode": "0664"
+    },
+    "artifacts/optional_imu_manifest.json": {
+      "sha256": "6b6f454187a6ac9dcb926a4a9d99b1c6044d3b29b87f57ae957e4d902b8f2f87",
+      "size": 3151,
+      "mode": "0664"
+    },
+    "artifacts/optional_imu_source.patch": {
+      "sha256": "c7b3f40e59a1f924d9ef5d3c9dc4bab3591fbe3d83dbb778b41378bc425efd1c",
+      "size": 51365,
+      "mode": "0664"
+    },
+    "artifacts/optional_imu_stationary_check.py": {
+      "sha256": "1178a0d94cf805fd86db3b09086d8338d558593df549758b5376732289af9889",
+      "size": 8495,
+      "mode": "0664"
+    },
+    "artifacts/optional_imu_validation.json": {
+      "sha256": "8924adac383de71dbc2c96ec2d8cecb267cb74316167cb366800e2062f652d72",
+      "size": 1267,
+      "mode": "0664"
+    },
+    "artifacts/orin_hardware_2026-11-09.json": {
+      "sha256": "59724960e8bf0249a9880225e08cf17adb9984baf3d87d4b0a8bd996b6ba33cc",
+      "size": 1706,
+      "mode": "0664"
+    },
+    "artifacts/physical_bitrate_scan.json": {
+      "sha256": "a6b2e0cb54426ee393b3703e72ec45a4373d3cd5a6d1dd106a441853a9511cc7",
+      "size": 299,
+      "mode": "0644"
+    },
+    "artifacts/physical_nmt_probe.json": {
+      "sha256": "8f20c15bdc6f3a893b7d419593db84e309743222cb2314e599477db65dc374b3",
+      "size": 2683,
+      "mode": "0644"
+    },
+    "artifacts/resumed_imu_sdo.json": {
+      "sha256": "74c38a2e1c3e49354409cb41889ee089c675e09e70e6e24fbc347ddc15941aca",
+      "size": 160,
+      "mode": "0664"
+    },
+    "artifacts/resumed_nmt_probe.json": {
+      "sha256": "89cab735f4670aec856761ff9741546674b6e16b63092ef93ea8c41b484a6b8e",
+      "size": 141,
+      "mode": "0664"
+    },
+    "artifacts/shared_can_gui_hardware.png": {
+      "sha256": "1df253d18b7089a577d12cfc1e88997e2332485f5c6d6ed22c735ee246c8884c",
+      "size": 120488,
+      "mode": "0664"
+    },
+    "artifacts/shared_can_gui_hardware_resumed.png": {
+      "sha256": "a65edf9185689409b6d4c045d187ed3025b07e8af19e00a2f4463b9e0d01d200",
+      "size": 120508,
+      "mode": "0664"
+    },
+    "artifacts/shared_can_gui_virtual.png": {
+      "sha256": "5dc9b9eaef257cfa605ab8f9e086b79786a7c1fdf4ec33255cfb22d2b53a9791",
+      "size": 131162,
+      "mode": "0644"
+    },
+    "artifacts/shared_can_hardware.json": {
+      "sha256": "df8562480b241b5c03f9132a834ee99e84beb131f05a7ab26984ba8e8b6936b1",
+      "size": 1881,
+      "mode": "0664"
+    },
+    "artifacts/shared_can_hardware_resumed.json": {
+      "sha256": "20aae55bb8b931a3cba4fb1ea149c7cf20378cfa1939b83b8b1b0e97ab637148",
+      "size": 1886,
+      "mode": "0664"
+    },
+    "artifacts/shared_can_virtual_smoke.json": {
+      "sha256": "3df3d40529f5f9b1469695013f9379a4f22a22f16d8b999fcd665459315a6ffa",
+      "size": 2128,
+      "mode": "0644"
+    },
+    "artifacts/validation_2026-11-09.json": {
+      "sha256": "81b3b0cc98ef4205513c41fc7144df33a285b0c6705a950d6fcdf7ca0cc56086",
+      "size": 2503,
+      "mode": "0664"
+    },
+    "docs/optional-imu.md": {
+      "sha256": "15e8c016eb7a1ba4e2e99e64afabb3466ae89e2ee36c468d867a5ea4c252bf6e",
+      "size": 6897,
+      "mode": "0664"
+    },
+    "docs/validation.md": {
+      "sha256": "602a4c2d2da402c2e23d6311048692c2f08a6e556bfcabb65a007e3f5063616f",
+      "size": 5152,
+      "mode": "0664"
+    },
+    "src/CMakeLists.txt": {
+      "sha256": "213186c5dafa6bdbff6a5a4398288aae340b54312a2ec1408039d6d84d790237",
+      "size": 237,
+      "mode": "0664"
+    },
+    "src/vehicle_core/CMakeLists.txt": {
+      "sha256": "f200e49eca4187dfdd1e2e72dfd0d41da5d9c21b6b369421a892c3639957be68",
+      "size": 969,
+      "mode": "0664"
+    },
+    "src/vehicle_core/include/vehicle_core/control.hpp": {
+      "sha256": "52f5f0fccd7b08d00f2d5a2134ac5c937d55d2c8e5c01e004c25651d3129af17",
+      "size": 1713,
+      "mode": "0644"
+    },
+    "src/vehicle_core/include/vehicle_core/imu.hpp": {
+      "sha256": "820c0b96500f5cf3c334df31bf76c45f83b0d26696943cf9950a6671b002608f",
+      "size": 2474,
+      "mode": "0664"
+    },
+    "src/vehicle_core/include/vehicle_core/motion_controller.hpp": {
+      "sha256": "18192d2139451795bd8fb5a7d85c0dcb7f3499cc2a14f13f49bf5c7957ba0efc",
+      "size": 2297,
+      "mode": "0664"
+    },
+    "src/vehicle_core/include/vehicle_core/odometry.hpp": {
+      "sha256": "786585b6460075c4b66f94ba801cbec92f46ec1673c2188f3f75b6f4c03c7dcc",
+      "size": 1299,
+      "mode": "0644"
+    },
+    "src/vehicle_core/include/vehicle_core/protocol.hpp": {
+      "sha256": "d2897003ca86f84456e08bac7efbc9ceb355037544172be4dacddafb0244b6cb",
+      "size": 2596,
+      "mode": "0644"
+    },
+    "src/vehicle_core/include/vehicle_core/transport.hpp": {
+      "sha256": "76f136b1ae18104f4fab4e194458a68def19d0a7381884465153b1e9a5b2a6b2",
+      "size": 925,
+      "mode": "0644"
+    },
+    "src/vehicle_core/include/vehicle_core/yaw_calibration.hpp": {
+      "sha256": "60fcb502e43e903f505d2a1a7dd50050735398cc60923e5aadfcffa134916d85",
+      "size": 2025,
+      "mode": "0664"
+    },
+    "src/vehicle_core/package.xml": {
+      "sha256": "d7fff6fcca94ca4d28e601624fe46a6fa099911c06393375172a4eb3364569ab",
+      "size": 367,
+      "mode": "0664"
+    },
+    "src/vehicle_core/src/imu.cpp": {
+      "sha256": "3185efa7bf3a8ae2f8df9616766c6d5c03334136b37d3c1281070b17536902e5",
+      "size": 4538,
+      "mode": "0664"
+    },
+    "src/vehicle_core/src/imu_socketcan.cpp": {
+      "sha256": "4919a0baf87296feed6426bf1283beb4a400bbe3c495d776de2ae12082c3ab83",
+      "size": 3959,
+      "mode": "0664"
+    },
+    "src/vehicle_core/src/motion_controller.cpp": {
+      "sha256": "ae2b92eb948c54a728ed002fa171f7beabedb0ca34e9cb53a34272268e07768e",
+      "size": 5236,
+      "mode": "0664"
+    },
+    "src/vehicle_core/src/odometry.cpp": {
+      "sha256": "7634c8e4b5800999e19787cf5fe0a08dc23b8a0ece84f402008aaa4454eadfc9",
+      "size": 3839,
+      "mode": "0644"
+    },
+    "src/vehicle_core/src/protocol.cpp": {
+      "sha256": "c9893542cf7f29d0420c2b037b0eb16427d8a04abf86daec2e51212e7db9baca",
+      "size": 5549,
+      "mode": "0644"
+    },
+    "src/vehicle_core/src/socketcan.cpp": {
+      "sha256": "bfefd1d90f6da64938d765a87988a4bb770a81cd8f471a75fbc7ada473d1b431",
+      "size": 3931,
+      "mode": "0664"
+    },
+    "src/vehicle_core/src/yaw_calibration.cpp": {
+      "sha256": "6f21e1711d3e9aaf3bfbcf22ddedf6a7afe0afb2ec55d4dbeffa982d7e05ddbd",
+      "size": 4739,
+      "mode": "0664"
+    },
+    "src/vehicle_core/test/test_core.cpp": {
+      "sha256": "46c8a903d558b4d9951c191409ebda3f765096d4ceba697c7036a614eaf2aa46",
+      "size": 22977,
+      "mode": "0644"
+    },
+    "src/vehicle_driver/CMakeLists.txt": {
+      "sha256": "f6ba07c9725ee047ff96c14482c5efd9b4f8b1a47a23977e7756b0e2d663c46e",
+      "size": 964,
+      "mode": "0664"
+    },
+    "src/vehicle_driver/config/vehicle.yaml": {
+      "sha256": "7f0d14e845cd62ad846c7f23ea388d7f05fc9b458902417cc31718b1371ea0dd",
+      "size": 2231,
+      "mode": "0664"
+    },
+    "src/vehicle_driver/launch/imu.launch": {
+      "sha256": "2fb7b29d4dccb548c1b38b2e309debfbf7683cdf935e0d815a35de2721fdc91a",
+      "size": 764,
+      "mode": "0664"
+    },
+    "src/vehicle_driver/launch/vehicle.launch": {
+      "sha256": "1cb62a59dc03abf8fbe6b885ea57498d8ee454c7b229ae28c83a9ee3222d678a",
+      "size": 1835,
+      "mode": "0664"
+    },
+    "src/vehicle_driver/package.xml": {
+      "sha256": "689618232e7b94917d0c47a7280993883c08103ef8a0dea8f9fac62e75b9ee31",
+      "size": 799,
+      "mode": "0664"
+    },
+    "src/vehicle_driver/src/heading_policy.hpp": {
+      "sha256": "10a888e0b04ba63b575c52f355c67f9971e014ee9cb53db938b6eac1ddf5861d",
+      "size": 908,
+      "mode": "0664"
+    },
+    "src/vehicle_driver/src/imu_node.cpp": {
+      "sha256": "50978218ac8fc83b88abeb8afdbaf1e23ccb606fa5767227d1158234280d7236",
+      "size": 15779,
+      "mode": "0664"
+    },
+    "src/vehicle_driver/src/vehicle_node.cpp": {
+      "sha256": "f3139a40917bcd6bbb53ba4c762635e390984b4621567dc257444da3ddb7532e",
+      "size": 44364,
+      "mode": "0664"
+    },
+    "src/vehicle_driver/test/test_default_control.py": {
+      "sha256": "183b262dcf35756623efba0e0e5b1e9c629f57d38bc17eb7db104553a7162ee4",
+      "size": 3810,
+      "mode": "0664"
+    },
+    "src/vehicle_driver/test/test_integration.py": {
+      "sha256": "cc7510951aef0224f5ec34097d6c5e3fa81fbc5f32bbdca2018b0fa236ab9b43",
+      "size": 30571,
+      "mode": "0664"
+    },
+    "src/vehicle_driver/test/test_optional_imu.py": {
+      "sha256": "48eed9872e8d2e42f612d3b76fd02c506c59b18b2bae9c1638bbec8c5ade5c15",
+      "size": 6518,
+      "mode": "0664"
+    },
+    "src/vehicle_driver/test/test_receive_only.py": {
+      "sha256": "67b0d9dbf41b396c69f2609487efcfe1294f0f14b86580a614c9db110686b1e7",
+      "size": 4896,
+      "mode": "0664"
+    },
+    "src/vehicle_driver/test/test_shared_classic.py": {
+      "sha256": "f8a2d1b8db322f6e56d7a5447a49fc96201447fff0c3eb99ecb638777f384f7f",
+      "size": 8163,
+      "mode": "0664"
+    },
+    "src/vehicle_gui/CMakeLists.txt": {
+      "sha256": "e7cc37fb70f25eebb37469fb0412be5d7eedc509021952c4734c684766ac9aa7",
+      "size": 374,
+      "mode": "0664"
+    },
+    "src/vehicle_gui/launch/console.launch": {
+      "sha256": "39900b4441a012fee897bdee571e979a4e3eeafca2cabb394fe14b2e8826c45b",
+      "size": 2085,
+      "mode": "0664"
+    },
+    "src/vehicle_gui/package.xml": {
+      "sha256": "9f69d8b44aa18f0681192df3314429b4bccbcb55ce47f75256984cf0cbd356ee",
+      "size": 910,
+      "mode": "0664"
+    },
+    "src/vehicle_gui/scripts/vehicle_gui": {
+      "sha256": "d267dc0657a7f5b75d0b74bb5c73858c6edb6fe11829a3e100fc8c4c8cd6d61a",
+      "size": 114,
+      "mode": "0775"
+    },
+    "src/vehicle_gui/setup.py": {
+      "sha256": "171ab352365f70f5603cc54508f5e2a7b067d42ff3fada7455ac4e258470687b",
+      "size": 174,
+      "mode": "0664"
+    },
+    "src/vehicle_gui/test/test_console.py": {
+      "sha256": "0ba1dae5d0dabcff9324fe07b89d2abced5deaee05b72aa361d28b4611e78881",
+      "size": 30595,
+      "mode": "0664"
+    },
+    "src/vehicle_gui/test/test_model.py": {
+      "sha256": "d512ce1d77a7e5bbf7a844af36f2c43d4997877b9184147b9f687bfb754b22c7",
+      "size": 5191,
+      "mode": "0664"
+    },
+    "src/vehicle_gui/test/test_steering.py": {
+      "sha256": "d5cfe8d2c0e39bd2ecadb54d5020a6422e369e30a9261d54bcabbbac90c8d1b5",
+      "size": 2531,
+      "mode": "0664"
+    },
+    "src/vehicle_gui/vehicle_gui/__init__.py": {
+      "sha256": "116e0871c10b499fc2577bb5998e77897e99d32bb797d545f706047ad2b248a9",
+      "size": 77,
+      "mode": "0664"
+    },
+    "src/vehicle_gui/vehicle_gui/main.py": {
+      "sha256": "4717d2652cdffb85dda1a83a8e0b969739ce49d62c1bc98729b8de77482581ef",
+      "size": 1705,
+      "mode": "0664"
+    },
+    "src/vehicle_gui/vehicle_gui/model.py": {
+      "sha256": "b44e90ebb0f4f301832962f4f9d3e544263dd7e0221cfb16fd3268eefbcaad4f",
+      "size": 12176,
+      "mode": "0664"
+    },
+    "src/vehicle_gui/vehicle_gui/ros_worker.py": {
+      "sha256": "250dd8c2d7f07eb592e42c43e9ba99a3b9820380f8e9ebf13736a9a0682fd6cd",
+      "size": 20427,
+      "mode": "0664"
+    },
+    "src/vehicle_gui/vehicle_gui/steering.py": {
+      "sha256": "a2729a55f2ba04fd2ef1f0f4efa821b127e8daaca47f105446499ef262dca13e",
+      "size": 3084,
+      "mode": "0664"
+    },
+    "src/vehicle_gui/vehicle_gui/viewmodel.py": {
+      "sha256": "5145f7df1034cffd93b6f43be2c3e7f35b7bb4d947e3e58c9b5fead5153ebba0",
+      "size": 3211,
+      "mode": "0664"
+    },
+    "src/vehicle_gui/vehicle_gui/window.py": {
+      "sha256": "447b4d8c54aeb1928c535885733a1144f6baee2df12226be4cee7ccd71166300",
+      "size": 52450,
+      "mode": "0664"
+    },
+    "src/vehicle_interfaces/CMakeLists.txt": {
+      "sha256": "c61617316dd7a69bcef9895cc07d6521800ef86e395df10f970d80194e7f7606",
+      "size": 517,
+      "mode": "0664"
+    },
+    "src/vehicle_interfaces/msg/Acknowledgement.msg": {
+      "sha256": "a124d3f4eb9aa7f06c62e756b6a66b24af34654af75bc2f77aea67c08af3e32a",
+      "size": 104,
+      "mode": "0664"
+    },
+    "src/vehicle_interfaces/msg/CanFrame.msg": {
+      "sha256": "dffae477098f0f0f67b742a87140d5c91c589d045166a449f669db109bc0d9cf",
+      "size": 97,
+      "mode": "0664"
+    },
+    "src/vehicle_interfaces/msg/DriverMotion.msg": {
+      "sha256": "c9ba96bf0df5c61d4081bf60a04b877d416852c07e8860e5a0ee033eadc45bb1",
+      "size": 76,
+      "mode": "0664"
+    },
+    "src/vehicle_interfaces/msg/DriverStatus.msg": {
+      "sha256": "4a14e673cf2798e0dfcad3f519da7861f66bf9bf552ad5ca0173666dba95bf1b",
+      "size": 211,
+      "mode": "0664"
+    },
+    "src/vehicle_interfaces/msg/Faults.msg": {
+      "sha256": "12efc5e2ccf4f5acaa51a9210623bd9d5ade10ae4e4c53155d8fe7e53be81d2c",
+      "size": 167,
+      "mode": "0664"
+    },
+    "src/vehicle_interfaces/msg/Heading.msg": {
+      "sha256": "2046e36688e38536f633a4d32bf63528fb1ca981727f0f6040b432e1c8df5244",
+      "size": 159,
+      "mode": "0664"
+    },
+    "src/vehicle_interfaces/msg/ImuCalibration.msg": {
+      "sha256": "661344d1f705486d3dec17d106b21347a36ce6b1bbb4ca5fae481b0a6a3a63fb",
+      "size": 483,
+      "mode": "0664"
+    },
+    "src/vehicle_interfaces/msg/ImuStatus.msg": {
+      "sha256": "625710318e46f72db113af63b2dbd799797cf89707609bb38265d1f9711cabbe",
+      "size": 800,
+      "mode": "0664"
+    },
+    "src/vehicle_interfaces/msg/MotionStatus.msg": {
+      "sha256": "ec672f222146b21f0264158377611c927264642a70f5dcc7e0cd5122b2b3e5f9",
+      "size": 481,
+      "mode": "0664"
+    },
+    "src/vehicle_interfaces/msg/Remote.msg": {
+      "sha256": "2540050e2a3e73476b25b73b494e63088eaa31f6673989b138924802eca8d3ab",
+      "size": 54,
+      "mode": "0664"
+    },
+    "src/vehicle_interfaces/msg/Sensors.msg": {
+      "sha256": "4a18dcf7f8334ff6a231cec0e42acec8d0b83526a94ae40aaeff657766ce3d7c",
+      "size": 138,
+      "mode": "0664"
+    },
+    "src/vehicle_interfaces/msg/State.msg": {
+      "sha256": "584a14fb0ff7265c38a41f4e9512f3526e4945a304c0d8035eebfa17243f161d",
+      "size": 365,
+      "mode": "0664"
+    },
+    "src/vehicle_interfaces/msg/Version.msg": {
+      "sha256": "3df3394515497d562453c2f6fd671efe4afe9d025fbc96907f4bdc183d4a04bc",
+      "size": 55,
+      "mode": "0664"
+    },
+    "src/vehicle_interfaces/msg/WheelMileage.msg": {
+      "sha256": "d70dc54481fbac52a1815c312a1954b44d68e26eeb18056fbe49f3691861ce7a",
+      "size": 67,
+      "mode": "0664"
+    },
+    "src/vehicle_interfaces/package.xml": {
+      "sha256": "e6f05363f5f2f7febbde2fd4693727392fa14f2707ad88369e09c1c73854687b",
+      "size": 450,
+      "mode": "0664"
+    },
+    "src/vehicle_interfaces/srv/Command.srv": {
+      "sha256": "578a94ae7bb4f5991e405cc769cb027169e162ae4582bd0c616af2b5b30237fb",
+      "size": 774,
+      "mode": "0664"
+    },
+    "src/vehicle_interfaces/srv/ExecuteMotion.srv": {
+      "sha256": "cdcab0ddf6d67d482029f7a088df55c92eeb776d977472d0bc90e7616ab03b23",
+      "size": 897,
+      "mode": "0664"
+    },
+    "test/ros_test_support.py": {
+      "sha256": "6edefdbaceaa30ab2be9a3855d70ed7158e0aee61019738542263cd8e335201f",
+      "size": 2731,
+      "mode": "0664"
+    },
+    "tools/build.sh": {
+      "sha256": "04f5dbb05a0225e680aca1df341f572a52bfdc4abc4415c562187c033b626dd1",
+      "size": 196,
+      "mode": "0775"
+    },
+    "tools/can_probe.py": {
+      "sha256": "81d9d96f6f3d3a5a8c6530dd7b4b43e36af784f6733e4fac88ec555fc69ab013",
+      "size": 1448,
+      "mode": "0775"
+    },
+    "tools/configure_can.sh": {
+      "sha256": "c262df624147f91663a4e511cc61ed7c890d1df1a5132dd786e3878a30499b0a",
+      "size": 785,
+      "mode": "0775"
+    },
+    "tools/export_source.sh": {
+      "sha256": "ceeac7003018d6d18e33658ad2c366324e39be6a23e5f1bd046b280e697bfa2c",
+      "size": 468,
+      "mode": "0775"
+    },
+    "tools/hardware_bench.py": {
+      "sha256": "e2f84887fcaa841f1ec11b7201dcb261b3b7fe427c65c4d2719d97076e8717f1",
+      "size": 11495,
+      "mode": "0755"
+    },
+    "tools/hardware_smoke.py": {
+      "sha256": "0812458fec283f2ecac9ff07d6429ce1bbe05be5101df35037411ede0917c6d0",
+      "size": 10508,
+      "mode": "0775"
+    },
+    "tools/install_shared_can_service.sh": {
+      "sha256": "f5806f69c1baf0f903502869ec522c6d78169a09b353aa322f898420879ac91e",
+      "size": 641,
+      "mode": "0755"
+    },
+    "tools/run.sh": {
+      "sha256": "481c99e863cb051c24d343e85fe4472fbe4dd2b5fa3797ce1a9ac49c2117685b",
+      "size": 477,
+      "mode": "0775"
+    },
+    "tools/seeed_mini_can0_config.sh": {
+      "sha256": "0cbb448ab07640daa3013a17c4eebb5cdbfbc58843ec206dbf90d161569f4d15",
+      "size": 737,
+      "mode": "0755"
+    },
+    "tools/test.sh": {
+      "sha256": "a500848b4be44a8d458dd3c544d0d3fc4c78c25620d3524146cc2156c5682626",
+      "size": 2395,
+      "mode": "0775"
+    },
+    "tools/vehicle-shared-can.service": {
+      "sha256": "4cc53abf7f5ef08b3e8576928cf1ea800f9f352fa107b69597b12e0093d27ba2",
+      "size": 438,
+      "mode": "0664"
+    }
+  },
+  "archive": {
+    "directory": "ros1",
+    "role": "ROS1 deployment archive; ROS2 remains the primary project",
+    "independent_files": true,
+    "colcon_ignore": true,
+    "local_documentation_overrides": {
+      "README.md": {
+        "sha256": "c21451c4edebc8ee6bd48b255c004dd579f3b5a414af216d71fb9ad0f07e1d42",
+        "reason": "Document the archive role and independent files, correct the remaining SSH address and shared/legacy CAN examples, and distinguish passive and explicit motion validation tools."
+      }
+    },
+    "additional_files": [
+      "docs/archive-sync.md",
+      "artifacts/source_snapshot_2026-11-11.json",
+      "artifacts/archive_sync_validation_2026-11-11.json",
+      "artifacts/archive_sync_core_2026-11-11.xml",
+      "artifacts/archive_sync_pytest_2026-11-11.xml"
+    ]
+  }
+}

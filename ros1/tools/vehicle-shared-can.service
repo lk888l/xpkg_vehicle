@@ -1,0 +1,16 @@
+[Unit]
+Description=Seeed Mini CAN0 transceiver and shared 500k Classic CAN
+After=local-fs.target systemd-udev-settle.service
+ConditionPathExists=/dev/gpiochip0
+
+[Service]
+Type=simple
+ExecStartPre=/sbin/modprobe mttcan
+ExecStart=/usr/bin/gpioset --mode=signal 0 43=0
+ExecStartPost=/usr/local/sbin/vehicle-shared-can-config
+ExecStopPost=-/sbin/ip link set dev can0 down
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

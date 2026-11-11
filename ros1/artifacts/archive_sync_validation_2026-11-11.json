@@ -1,0 +1,174 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-11",
+  "purpose": "Synchronize the ROS1 deployment archive while keeping ROS2 the primary project.",
+  "source_manifest": "source_snapshot_2026-11-11.json",
+  "source": {
+    "ssh": "orin@172.18.7.207",
+    "workspace": "/home/orin/vehicle_noetic_ws",
+    "resolved_workspace": "/home/orin/robotics/dependencies/vehicle_noetic_ws",
+    "git_revision": null
+  },
+  "catkin_build": "passed",
+  "core_tests": {
+    "tests": 34,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "suites": [
+      {
+        "name": "MotionController",
+        "tests": "6",
+        "failures": "0",
+        "disabled": "0",
+        "errors": "0",
+        "time": "0",
+        "timestamp": "2026-11-11T11:15:40"
+      },
+      {
+        "name": "Protocol",
+        "tests": "10",
+        "failures": "0",
+        "disabled": "0",
+        "errors": "0",
+        "time": "0.003",
+        "timestamp": "2026-11-11T11:15:40"
+      },
+      {
+        "name": "Control",
+        "tests": "2",
+        "failures": "0",
+        "disabled": "0",
+        "errors": "0",
+        "time": "0",
+        "timestamp": "2026-11-11T11:15:40"
+      },
+      {
+        "name": "Odometry",
+        "tests": "6",
+        "failures": "0",
+        "disabled": "0",
+        "errors": "0",
+        "time": "0",
+        "timestamp": "2026-11-11T11:15:40"
+      },
+      {
+        "name": "Transport",
+        "tests": "1",
+        "failures": "0",
+        "disabled": "0",
+        "errors": "0",
+        "time": "0.005",
+        "timestamp": "2026-11-11T11:15:40"
+      },
+      {
+        "name": "Imu",
+        "tests": "3",
+        "failures": "0",
+        "disabled": "0",
+        "errors": "0",
+        "time": "0",
+        "timestamp": "2026-11-11T11:15:40"
+      },
+      {
+        "name": "YawCalibration",
+        "tests": "4",
+        "failures": "0",
+        "disabled": "0",
+        "errors": "0",
+        "time": "0.001",
+        "timestamp": "2026-11-11T11:15:40"
+      },
+      {
+        "name": "ImuClassic",
+        "tests": "2",
+        "failures": "0",
+        "disabled": "0",
+        "errors": "0",
+        "time": "0",
+        "timestamp": "2026-11-11T11:15:40"
+      }
+    ]
+  },
+  "python_tests": {
+    "tests": 103,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "suites": [
+      {
+        "errors": "0",
+        "failures": "0",
+        "hostname": "orin-desktop",
+        "name": "pytest",
+        "skipped": "0",
+        "tests": "103",
+        "time": "187.779",
+        "timestamp": "2026-11-11T11:15:40.802136"
+      }
+    ]
+  },
+  "total_tests": 137,
+  "environment": {
+    "os": {
+      "NAME": "Ubuntu",
+      "VERSION": "20.04.6 LTS (Focal Fossa)",
+      "PRETTY_NAME": "Ubuntu 20.04.6 LTS",
+      "VERSION_ID": "20.04"
+    },
+    "architecture": "aarch64",
+    "python": "3.8.10",
+    "compiler": "g++ (Ubuntu 9.4.0-1ubuntu1~20.04.2) 9.4.0",
+    "ros": "Noetic"
+  },
+  "test_isolation": {
+    "can_interface": "vcan_ar1111",
+    "ros_master_uri": "http://127.0.0.1:11349",
+    "qt_platform": "offscreen",
+    "vcan_removed": true,
+    "master_stopped": true,
+    "remaining_test_processes": [],
+    "physical_can_tests_run": false,
+    "deployed_workspace_modified": false
+  },
+  "temporary_workspace_removed": true,
+  "remote_source_files_unchanged_after_tests": 119,
+  "completed_at_utc": "2026-11-11T03:20:11.641161+00:00",
+  "test_log_summary": "103 passed, 10007 warnings in 188.34 seconds",
+  "deprecation_warning_messages": [
+    "/usr/lib/python3/dist-packages/pyqtgraph/graphicsItems/AxisItem.py:1081: DeprecationWarning: an integer is required (got type Alignment).  Implicit conversion to integers using __int__ is deprecated, and may be removed in a future version of Python.",
+    "/usr/lib/python3/dist-packages/pyqtgraph/graphicsItems/AxisItem.py:924: DeprecationWarning: an integer is required (got type numpy.float64).  Implicit conversion to integers using __int__ is deprecated, and may be removed in a future version of Python.",
+    "/usr/lib/python3/dist-packages/pyqtgraph/graphicsItems/PlotItem/PlotItem.py:340: DeprecationWarning: an integer is required (got type numpy.float64).  Implicit conversion to integers using __int__ is deprecated, and may be removed in a future version of Python."
+  ],
+  "local_checks": {
+    "python38_syntax_files": 22,
+    "shell_syntax_files": 7,
+    "launch_and_package_xml_files": 7,
+    "archive_symlinks": 0,
+    "colcon_ignore_present": true,
+    "remote_files": 119,
+    "byte_identical_remote_files": 118,
+    "documentation_overrides": [
+      "README.md"
+    ],
+    "unchanged_ros2_and_root_files": 123,
+    "root_readme_only_ros2_exterior_change": true,
+    "checked_local_markdown_links": 32,
+    "source_tool_test_files_match_remote": 76,
+    "unexpected_source_files_excluding_generated_caches": 0,
+    "protected_files_unchanged": 123,
+    "git_diff_check": "passed",
+    "standalone_export": "passed"
+  },
+  "runtime_defaults": {
+    "receive_only": false,
+    "auto_initialize": false,
+    "auto_imu_calibration": false,
+    "use_imu": true,
+    "can_interface": "can0",
+    "imu_can_interface": "can0",
+    "imu_protocol": "classic",
+    "imu_node_id": 31
+  },
+  "physical_motion_or_imu_revalidated": false
+}

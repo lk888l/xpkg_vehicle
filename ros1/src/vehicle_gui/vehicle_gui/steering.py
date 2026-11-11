@@ -71,7 +71,7 @@ class SteeringController:
             return 0.0, 0.0
         if yaw is None:
             self.cancel()
-            self.mode = "IMU 航向过期，定角转向已结束"
+            self.mode = "航向反馈过期，定角转向已结束"
             return 0.0, 0.0
         current = self.observe(yaw)
         wz = self._correction(current, max_rate)

@@ -1,0 +1,9 @@
+{
+  "action": "one addressed NMT Start for node 31",
+  "frames": {
+    "0x81e101b0": 8
+  },
+  "last_payloads": {
+    "0x81e101b0": "00"
+  }
+}

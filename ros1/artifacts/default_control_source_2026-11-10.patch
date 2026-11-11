@@ -1,0 +1,396 @@
+diff --git a/README.md b/README.md
+--- a/README.md
++++ b/README.md
+@@ -2,7 +2,7 @@
+ 
+ 原工程的 Noetic 移植工作区。保留底盘 CAN 协议、IMU CAN-FD 协议、全部遥测字段、里程计、TF、方向标定、定角/定距运动和 PyQt5 控制台。ROS2 源码及原有未提交修改保留在上级目录。
+ 
+-已部署到 `orin@172.18.2.136:/home/orin/vehicle_noetic_ws`。默认底盘接口 `can0`，IMU 使用共享 `can0` 上的 Classic CAN 四 PDO 协议、节点号 31；独立 CAN-FD IMU 可显式选择接口和协议。实际验证情况见 [Orin 验证记录](docs/validation.md)。
++已部署到 `orin@172.18.7.207:/home/orin/vehicle_noetic_ws`。默认底盘接口 `can0`，IMU 使用共享 `can0` 上的 Classic CAN 四 PDO 协议、节点号 31；独立 CAN-FD IMU 可显式选择接口和协议。实际验证情况见 [Orin 验证记录](docs/validation.md)。
+ 
+ ## 使能前选择有无 IMU
+ 
+@@ -10,15 +10,17 @@
+ 
+ ```bash
+ cd /home/orin/vehicle_noetic_ws
+-# 当前仅连接 can0 底盘、未连接 IMU：
++# 当前仅连接 can0 底盘、未连接 IMU，默认允许实际控制：
+ bash tools/run.sh gui use_imu:=false
+-# 允许通过界面使能、设置 CAN 模式和运动，启动时仍不自动使能：
+-bash tools/run.sh gui use_imu:=false receive_only:=false
+ # 无界面运行，仍由 /vehicle/command 显式使能和设置模式：
+-bash tools/run.sh driver use_imu:=false receive_only:=false
++bash tools/run.sh driver use_imu:=false
+ # 接入 IMU 后选择：
+-bash tools/run.sh gui use_imu:=true receive_only:=false
++bash tools/run.sh gui use_imu:=true
++# 只观察、不发送底盘命令时显式选择：
++bash tools/run.sh gui use_imu:=false receive_only:=true
+ ```
++
++GUI 启动后点击“使能”，选择“CAN 控制”并点击“应用模式与蜂鸣器”，再按住方向按钮或 W/A/S/D 控制。默认 `receive_only=false` 已开放命令发送，不需要额外参数；`auto_initialize=false` 表示使能和模式仍由操作者明确下达。已有进程必须退出重启才能使用新默认值，`start_driver:=false` 只附着已有驱动，不会更改其配置。
+ 
+ | 行为 | `use_imu:=true` | `use_imu:=false` |
+ |---|---|---|
+@@ -45,18 +47,18 @@
+ 
+ 设计和验证说明见 [可选 IMU 架构](docs/optional-imu.md)。
+ 
+-## 本阶段的启动方式
++## 启动方式
+ 
+-所有启动入口和直接运行的底盘节点都默认 `receive_only=true`。该模式禁止底盘全部应用层 CAN 发送，包括使能、模式、速度、标定、复位和退出时的零速/失能帧；服务明确返回拒绝原因。IMU 的寻址 NMT Start 与姿态置零保持可用，不驱动底盘。
++所有启动入口、YAML 和直接运行的底盘节点都默认 `receive_only=false`，可发送使能、模式与速度命令。需要只接收观察时设置 `receive_only:=true`；该模式禁止底盘全部应用层 CAN 发送，包括退出时的零速/失能帧，服务明确返回拒绝原因。IMU 的寻址 NMT Start 与姿态置零保持可用，不驱动底盘。
+ 
+ 在 Orin 上：
+ 
+ ```bash
+ cd /home/orin/vehicle_noetic_ws
+ bash tools/build.sh
+-bash tools/run.sh driver                 # 底盘只接收 + IMU
++bash tools/run.sh driver                 # 底盘控制 + IMU
+ bash tools/run.sh imu                    # 单独测试 IMU
+-bash tools/run.sh gui                    # 在图形桌面中打开完整控制台，底盘仍只接收
++bash tools/run.sh gui                    # 在图形桌面中打开可实际控制的完整控制台
+ ```
+ 
+ 需要 install 空间时运行 `bash tools/build.sh install`，随后加载 `install/setup.bash` 使用标准 `roslaunch` 命令；该构建与入口也已在 Orin 验证。
+@@ -104,7 +106,7 @@
+ | 状态、版本、标定与运动结果缓存 | ROS1 latched publisher，对应原 transient-local depth 1 |
+ | ROS2 组件加载 | 使用 ROS1 独立进程；不需要 DDS 或 ROS2 运行环境 |
+ 
+-本阶段唯一主动改变的运行默认值是禁止底盘发送和关闭自动初始化/旋转标定。运动实现和相关测试完整保留。以后允许实车运动时，必须显式设置 `receive_only:=false`；同时设置 `auto_initialize:=true`、`auto_imu_calibration:=true` 才会恢复原工程的启动使能与双向旋转标定行为。本次验证没有在实车启用这些选项。
++2026-11-10 起默认允许底盘发送，`auto_initialize=false`、`auto_imu_calibration=false` 保留。需要启动后自动使能并设置 CAN 模式时可显式设置 `auto_initialize:=true`；IMU 双向旋转标定是另一个独立选项 `auto_imu_calibration:=true`，普通实际控制不要求启用它。
+ 
+ ## ROS1 接口
+ 
+@@ -155,7 +157,7 @@
+ bash tools/build.sh
+ ```
+ 
+-完整测试包含原 C++ 核心用例、ROS1 驱动/IMU 集成、PyQt 键盘与服务交互、路径 CSV、运动续期及默认只接收模式。只在隔离 `vcan_noetic` 上模拟运动：
++完整测试包含原 C++ 核心用例、ROS1 驱动/IMU 集成、PyQt 键盘与服务交互、路径 CSV、运动续期、三个默认控制启动入口及显式只接收模式。只在隔离 `vcan_noetic` 上模拟运动：
+ 
+ ```bash
+ # 创建/删除 vcan、测试网络断开恢复需要 NET_ADMIN；Orin 可使用 sudo。
+diff --git a/docs/optional-imu.md b/docs/optional-imu.md
+--- a/docs/optional-imu.md
++++ b/docs/optional-imu.md
+@@ -16,7 +16,7 @@
+ 
+ 先失能并退出本驱动，使用 `use_imu:=false` 或 `use_imu:=true` 重新启动，再使能。没有运行时修改接口。ROS1 参数服务器只是启动输入，启动后的 `rosparam set` 不生效，GUI 持续以驱动发布的生效值为准。
+ 
+-`receive_only=true`、`auto_initialize=false`、`auto_imu_calibration=false` 的原默认值保留。无 IMU 模式即使残留 `auto_imu_calibration=true` 也不会请求方向标定。`start_imu=false` 用于外部 IMU 驱动，只有 `use_imu=false` 才选择无 IMU 策略。
++2026-11-10 起统一默认 `receive_only=false`，允许实际控制；只观察时显式指定 `receive_only:=true`。`auto_initialize=false`、`auto_imu_calibration=false` 保留，使能和模式由操作者明确下达。无 IMU 模式即使残留 `auto_imu_calibration=true` 也不会请求方向标定。`start_imu=false` 用于外部 IMU 驱动，只有 `use_imu=false` 才选择无 IMU 策略。
+ 
+ 无 IMU 的定角和定距精度取决于底盘速度 / 轮里程计精度及轮滑；应按实际地面测量后再调整容差。底盘失能时当前设备只发 B0 心跳，尚无 B1/B2 时界面能正确显示“无 IMU 模式”，但不会凭空产生可用航向或接受自动运动。
+ 
+@@ -42,3 +42,15 @@
+ - 有 IMU 路径通过虚拟 CAN 的 Classic / FD、标定及失效回归；本次未连接实物 IMU，未宣称通过实物 IMU 验证。
+ 
+ 原始记录：`artifacts/optional_imu_hardware_readonly.json`、`artifacts/optional_imu_hardware_stationary.json`、`artifacts/optional_imu_console.png`。部署前备份：`artifacts/optional_imu_backup_20261109_205617.tgz`。
++
++## 2026-11-10 默认实际控制修复
++
++问题来自原先三个层次均默认 `receive_only=true`：GUI / 驱动 launch、YAML、C++ 节点。它会明确拒绝使能、模式与速度命令，与本次用户期望的默认实际控制不符。现统一改为 `false`，GUI 和直接运行节点均无需附加该参数。`receive_only:=true` 仍能显式选择只接收，自动使能和 IMU 自动标定继续为独立的显式选项。
++
++远端地址更新为 `orin@172.18.7.207`。Orin 原生编译、devel / install 更新完成；34 个 C++ 核心测试、103 个 Python/ROS/GUI 测试通过，零失败、零跳过。新增用例实际启动三个入口，在不传 `receive_only` 和 `auto_initialize` 参数时验证初始失能、显式使能、CAN 模式、非零速度和停止；原只接收测试改为显式传入 `true`，继续校验全过程无底盘发送。
++
++用户确认底盘架空后，使用 `tools/hardware_bench.py --use-imu false --motion` 测试实际 can0。未传 `receive_only`，诊断确认生效值为 0；前进 / 后退给定 ±0.05 m/s，左右转向给定 ±0.15 rad/s，每段 1.2 秒，均观察到四路轮速响应并确认停转。独立 CAN 抓包中的速度元组只有 `(±50,0,0)`、`(0,0,±150)` 和零速，单位 mm/s、mrad/s；没有异常放大后的发送命令。停止发布的看门狗测试在约 306 ms 后发出零速。结束时确认失能，四路轮速均为 0 RPM，驱动收发错误计数为 0。
++
++这次验证控制链路和停止行为，不代表速度精度通过：B2 反馈峰值仍达 |vx|=1.387 m/s、|wz|=3.928 rad/s，明显超过上述给定值；没有独立测量来判定是真实轮动、控制器或反馈量纲问题。地面定速、定距和定角精度仍需后续验收。
++
++原始证据：`artifacts/default_control_bench_2026-11-10.json`、同名 `.frames.json`、`test_results/pytest.xml`。变更前备份：`artifacts/default_control_backup_20261110_121149.tgz`。
+diff --git a/docs/validation.md b/docs/validation.md
+--- a/docs/validation.md
++++ b/docs/validation.md
+@@ -1,4 +1,6 @@
+ # Noetic 移植与 Orin 验证记录
++
++以下是 2026-11-09 的历史记录，当时默认为只接收。2026-11-10 起默认改为允许实际控制，当前入口和操作步骤以 [README](../README.md) 为准；`tools/hardware_smoke.py` 继续显式使用只接收模式。
+ 
+ 日期：2026-11-09。目标：`orin@172.18.2.136`，工作区 `/home/orin/vehicle_noetic_ws`。
+ 
+diff --git a/src/vehicle_driver/config/vehicle.yaml b/src/vehicle_driver/config/vehicle.yaml
+--- a/src/vehicle_driver/config/vehicle.yaml
++++ b/src/vehicle_driver/config/vehicle.yaml
+@@ -1,5 +1,6 @@
+-# Default: observe only; no chassis frames, including shutdown frames.
+-receive_only: true
++# Control is available by default; enable and CAN mode remain explicit operations.
++# Set true for passive observation with no chassis frames, including on shutdown.
++receive_only: false
+ can_interface: can0
+ imu_can_interface: can0
+ # Updated four-PDO firmware, sharing 500 kbit/s Classic CAN with the chassis.
+diff --git a/src/vehicle_driver/launch/vehicle.launch b/src/vehicle_driver/launch/vehicle.launch
+--- a/src/vehicle_driver/launch/vehicle.launch
++++ b/src/vehicle_driver/launch/vehicle.launch
+@@ -7,7 +7,7 @@
+   <arg name="use_imu" default="true" doc="Select IMU or chassis heading before enabling; restart to change"/>
+   <arg name="start_driver" default="true"/>
+   <arg name="start_imu" default="$(arg use_imu)"/>
+-  <arg name="receive_only" default="true"/>
++  <arg name="receive_only" default="false" doc="Set true to explicitly block all chassis transmissions"/>
+   <arg name="auto_initialize" default="false"/>
+   <arg name="auto_imu_calibration" default="false"/>
+   <arg name="use_stamped_cmd_vel" default="true"/>
+diff --git a/src/vehicle_driver/src/vehicle_node.cpp b/src/vehicle_driver/src/vehicle_node.cpp
+--- a/src/vehicle_driver/src/vehicle_node.cpp
++++ b/src/vehicle_driver/src/vehicle_node.cpp
+@@ -57,7 +57,7 @@
+ class VehicleNode final {
+  public:
+   VehicleNode() : heading_policy_(parameter<bool>("use_imu_heading", true)) {
+-    receive_only_ = parameter<bool>("receive_only", true);
++    receive_only_ = parameter<bool>("receive_only", false);
+     interface_ = parameter<std::string>("can_interface", "can0");
+     const int type = parameter<int>("device_type", 0xE1);
+     const int node = parameter<int>("device_node", 1);
+@@ -890,7 +890,7 @@
+   ros::AsyncSpinner command_spinner_{2, &command_queue_};
+   std::mutex mutex_;
+   std::condition_variable pending_changed_;
+-  bool receive_only_{true}, shutting_down_{};
++  bool receive_only_{false}, shutting_down_{};
+   double max_linear_speed_{}, max_angular_speed_{};
+   uint64_t blocked_transmissions_{};
+   core::Address address_;
+diff --git a/src/vehicle_driver/test/test_default_control.py b/src/vehicle_driver/test/test_default_control.py
+--- /dev/null
++++ b/src/vehicle_driver/test/test_default_control.py
+@@ -0,0 +1,81 @@
++"""Exercise the actual default startup entries through SocketCAN and TCPROS."""
++import os
++import signal
++import struct
++import subprocess
++import time
++
++import pytest
++import rospy
++from geometry_msgs.msg import TwistStamped
++from vehicle_interfaces.msg import State
++from vehicle_interfaces.srv import Command, CommandRequest
++from ros_test_support import RosProbe, executable, init_ros
++from test_integration import Emulator
++
++
++@pytest.mark.parametrize("entry", ["node", "driver", "gui"])
++def test_default_allows_explicit_enable_mode_and_motion(tmp_path, entry):
++    interface = os.environ.get("VEHICLE_TEST_CAN")
++    if not interface:
++        pytest.skip("Set VEHICLE_TEST_CAN to an isolated vcan interface")
++    init_ros()
++    namespace = "/defaults_check"
++    if rospy.has_param(namespace):
++        rospy.delete_param(namespace)  # Do not let a previous entry supply its defaults.
++    chassis = Emulator(interface)
++    probe = RosProbe()
++    states = []
++    probe.create_subscription(State, namespace + "/vehicle/state", states.append, 10)
++    publisher = probe.create_publisher(TwistStamped, namespace + "/cmd_vel", 1)
++    if entry == "node":
++        args = [executable("vehicle_node"), "__ns:=" + namespace,
++                "_can_interface:=" + interface, "_use_imu_heading:=false"]
++    else:
++        package, launch = ("vehicle_driver", "vehicle.launch") if entry == "driver" else \
++                          ("vehicle_gui", "console.launch")
++        args = ["roslaunch", package, launch, "namespace:=" + namespace,
++                "can_interface:=" + interface, "use_imu:=false"]
++    # No receive_only or auto_initialize overrides: exercise shipped defaults.
++    env = dict(os.environ, QT_QPA_PLATFORM="offscreen", PYQTGRAPH_QT_LIB="PyQt5")
++    with (tmp_path / "default_control.log").open("w") as log:
++        process = subprocess.Popen(args, env=env, stdout=log, stderr=subprocess.STDOUT)
++
++        def wait(predicate, timeout=8):
++            until = time.monotonic() + timeout
++            while not predicate() and time.monotonic() < until:
++                assert process.poll() is None
++                time.sleep(.02)
++            assert predicate()
++
++        try:
++            wait(lambda: states and states[-1].online and publisher.get_subscription_count())
++            assert not chassis.enabled  # Enabling is still an explicit operator action.
++            command = rospy.ServiceProxy(namespace + "/vehicle/command", Command)
++            rospy.wait_for_service(namespace + "/vehicle/command", timeout=5)
++            enabled = command(CommandRequest(command=3, enabled=True))
++            assert enabled.sent and enabled.state_confirmed, enabled.message
++            mode = command(CommandRequest(command=17, mode=2))
++            assert mode.sent and mode.state_confirmed, mode.message
++            before = len(chassis.commands)
++            message = TwistStamped()
++            message.twist.linear.x = .05
++            for _ in range(5):
++                publisher.publish(message)
++                time.sleep(.04)
++            wait(lambda: any(code == 0x12 and struct.unpack("<hhh", data) == (50, 0, 0)
++                             for _, code, data in chassis.commands[before:]))
++            publisher.publish(TwistStamped())
++            wait(lambda: chassis.requested_motion == (0, 0, 0))
++            disabled = command(CommandRequest(command=3, enabled=False))
++            assert disabled.sent and disabled.state_confirmed, disabled.message
++        finally:
++            if process.poll() is None:
++                process.send_signal(signal.SIGINT)
++                try:
++                    process.wait(timeout=10)
++                except subprocess.TimeoutExpired:
++                    process.terminate()
++                    process.wait(timeout=5)
++            probe.destroy_node()
++            chassis.close()
+diff --git a/src/vehicle_driver/test/test_integration.py b/src/vehicle_driver/test/test_integration.py
+--- a/src/vehicle_driver/test/test_integration.py
++++ b/src/vehicle_driver/test/test_integration.py
+@@ -199,7 +199,7 @@
+             str(binary), "__name:=test_vehicle", "cmd_vel:=test_cmd_vel", "odom:=test_odom",
+             "diagnostics:=test_diagnostics", "imu/data:=test_imu_data",
+             f"_can_interface:={interface}", "_publish_tf:=false", "_service_timeout:=0.6",
+-            "_receive_only:=false", "_auto_initialize:=true",
++            "_auto_initialize:=true",
+             f"_use_imu_heading:={str(use_imu).lower()}",
+             f"_auto_imu_calibration:={str(auto_calibrate is not False).lower()}",
+         ]
+diff --git a/src/vehicle_driver/test/test_optional_imu.py b/src/vehicle_driver/test/test_optional_imu.py
+--- a/src/vehicle_driver/test/test_optional_imu.py
++++ b/src/vehicle_driver/test/test_optional_imu.py
+@@ -109,14 +109,17 @@
+ @pytest.mark.parametrize("package,launch", [
+     ("vehicle_driver", "vehicle.launch"), ("vehicle_gui", "console.launch")])
+ @pytest.mark.parametrize("use_imu,start_imu", [(False, False), (False, True), (True, False), (True, True)])
+-def test_launch_composes_one_consistent_heading_mode(package, launch, use_imu, start_imu):
++@pytest.mark.parametrize("receive_only", [False, True])
++def test_launch_composes_one_consistent_heading_mode(package, launch, use_imu, start_imu, receive_only):
+     args = [package, launch, "namespace:=mode_check",
+             "use_imu:=" + str(use_imu).lower(), "start_imu:=" + str(start_imu).lower()]
++    if receive_only:
++        args.append("receive_only:=true")
+     nodes = subprocess.check_output(["roslaunch", "--nodes"] + args, text=True).splitlines()
+     assert ("/mode_check/imu" in nodes) == (use_imu and start_imu)
+     params = yaml.safe_load(subprocess.check_output(["roslaunch", "--dump-params"] + args, text=True))
+     assert params["/mode_check/vehicle/use_imu_heading"] is use_imu
+-    assert params["/mode_check/vehicle/receive_only"] is True
++    assert params["/mode_check/vehicle/receive_only"] is receive_only
+     assert params["/mode_check/vehicle/auto_initialize"] is False
+ 
+ 
+diff --git a/src/vehicle_driver/test/test_receive_only.py b/src/vehicle_driver/test/test_receive_only.py
+--- a/src/vehicle_driver/test/test_receive_only.py
++++ b/src/vehicle_driver/test/test_receive_only.py
+@@ -1,4 +1,4 @@
+-"""Prove the default mode emits no chassis frames, even under active requests."""
++"""Prove explicit receive-only mode blocks all chassis frames and requests."""
+ import os
+ from pathlib import Path
+ import signal
+@@ -19,7 +19,7 @@
+ 
+ @pytest.mark.parametrize("imu_type", [ImuEmulator, ClassicImuEmulator])
+ @pytest.mark.parametrize("stamped", [True, False])
+-def test_default_receive_only_blocks_all_commands_and_shutdown(tmp_path, stamped, imu_type):
++def test_explicit_receive_only_blocks_all_commands_and_shutdown(tmp_path, stamped, imu_type):
+     interface = os.environ.get("VEHICLE_TEST_CAN")
+     if not interface:
+         pytest.skip("Set VEHICLE_TEST_CAN to an isolated vcan interface")
+@@ -38,6 +38,7 @@
+         try:
+             processes.append(subprocess.Popen([
+                 executable("vehicle_node"), "__name:=guard_vehicle", f"_can_interface:={interface}",
++                "_receive_only:=true",
+                 "_auto_initialize:=true", "_auto_imu_calibration:=true", "_publish_tf:=false",
+                 f"_use_stamped_cmd_vel:={str(stamped).lower()}", "cmd_vel:=guard_cmd_vel",
+                 "imu/data:=guard_imu_data", "diagnostics:=guard_diagnostics",
+diff --git a/src/vehicle_gui/launch/console.launch b/src/vehicle_gui/launch/console.launch
+--- a/src/vehicle_gui/launch/console.launch
++++ b/src/vehicle_gui/launch/console.launch
+@@ -8,7 +8,7 @@
+   <arg name="use_imu" default="true" doc="Select IMU or chassis heading before enabling; restart to change"/>
+   <arg name="start_imu" default="$(eval arg('start_driver') and arg('use_imu'))"/>
+   <arg name="imu_auto_start" default="true"/>
+-  <arg name="receive_only" default="true"/>
++  <arg name="receive_only" default="false" doc="Set true to explicitly block all chassis transmissions"/>
+   <arg name="auto_initialize" default="false"/>
+   <arg name="auto_imu_calibration" default="false"/>
+   <arg name="use_stamped_cmd_vel" default="true"/>
+diff --git a/src/vehicle_gui/test/test_console.py b/src/vehicle_gui/test/test_console.py
+--- a/src/vehicle_gui/test/test_console.py
++++ b/src/vehicle_gui/test/test_console.py
+@@ -58,7 +58,6 @@
+         str(binary), "__name:=test_vehicle", "cmd_vel:=test_cmd_vel", "odom:=test_odom",
+         "diagnostics:=test_diagnostics", f"_can_interface:={interface}", "_publish_tf:=false",
+         "_service_timeout:=0.4", "_auto_imu_calibration:=false", "_auto_initialize:=true",
+-        "_receive_only:=false",
+         f"_use_imu_heading:={str(use_imu).lower()}",
+     ], stdout=output, stderr=subprocess.STDOUT)
+     rospy.set_param("/test_gui/driver_name", "test_vehicle")
+diff --git a/tools/hardware_bench.py b/tools/hardware_bench.py
+--- a/tools/hardware_bench.py
++++ b/tools/hardware_bench.py
+@@ -23,6 +23,7 @@
+     p.add_argument('--interface', default='can0')
+     p.add_argument('--port', type=int, default=11331)
+     p.add_argument('--motion', action='store_true')
++    p.add_argument('--use-imu', choices=('true', 'false'), default='true')
+     p.add_argument('--output', type=Path, required=True)
+     args=p.parse_args()
+     with socket.socket() as probe:
+@@ -37,13 +38,16 @@
+     from geometry_msgs.msg import TwistStamped
+     from nav_msgs.msg import Odometry
+     from sensor_msgs.msg import Imu
++    from diagnostic_msgs.msg import DiagnosticArray
+     from vehicle_interfaces.msg import State, DriverMotion, DriverStatus, ImuStatus
+     from vehicle_interfaces.srv import Command, CommandRequest
+ 
+     args.output.parent.mkdir(parents=True,exist_ok=True)
+     report={'utc':datetime.now(timezone.utc).isoformat(),'interface':args.interface,
+-            'motion_requested':args.motion,'commands':[],'phases':[],'completed':False}
++            'motion_requested':args.motion,'use_imu':args.use_imu == 'true',
++            'commands':[],'phases':[],'completed':False}
+     states=[];velocities=[];wheels=[];electrical=[];imu_status=[];imu_data=[];odometry=[]
++    diagnostics=[]
+     processes=[];subs=[];proxy=None;publisher=None
+     bus=socket.socket(socket.AF_CAN,socket.SOCK_RAW,socket.CAN_RAW)
+     bus.bind((args.interface,));bus.settimeout(.05)
+@@ -142,18 +146,27 @@
+                 (DriverMotion,'/bench/vehicle/driver_motion',wheels),
+                 (DriverStatus,'/bench/vehicle/driver_status',electrical),
+                 (ImuStatus,'/bench/imu/status',imu_status),(Imu,'/bench/imu/data',imu_data),
++                (DiagnosticArray,'/bench/diagnostics',diagnostics),
+                 (Odometry,'/bench/odom',odometry)):
+             subs.append(rospy.Subscriber(topic,cls,lambda m,d=dest:d.append((time.monotonic(),m)),queue_size=200))
+         publisher=rospy.Publisher('/bench/cmd_vel',TwistStamped,queue_size=1,tcp_nodelay=True)
+-        for binary,params in [('vehicle_node',['_receive_only:=false','_auto_initialize:=false',
++        # Deliberately omit receive_only: this validates the node's control default.
++        nodes=[('vehicle_node',['_auto_initialize:=false',
+                    '_auto_imu_calibration:=false','_max_linear_speed:=0.10','_max_angular_speed:=0.20',
+-                   '_publish_tf:=false','_can_interface:='+args.interface]),
+-                 ('imu_node',['_imu_protocol:=classic','_imu_can_interface:='+args.interface])]:
++                   '_publish_tf:=false','_can_interface:='+args.interface,
++                   '_use_imu_heading:='+args.use_imu])]
++        if args.use_imu == 'true':
++            nodes.append(('imu_node',['_imu_protocol:=classic','_imu_can_interface:='+args.interface]))
++        for binary,params in nodes:
+             processes.append(subprocess.Popen([find_node('vehicle_driver',binary)[0],'__ns:=/bench']+params,
+                                                stdout=log,stderr=subprocess.STDOUT))
+         rospy.wait_for_service('/bench/vehicle/command',timeout=6)
+         proxy=rospy.ServiceProxy('/bench/vehicle/command',Command)
+         wait(lambda:states and states[-1][1].online,3,'chassis online')
++        wait(lambda:diagnostics,3,'driver diagnostics')
++        effective={item.key:item.value for item in diagnostics[-1][1].status[0].values}
++        report['receive_only']=effective.get('receive_only')
++        if report['receive_only'] != '0':raise RuntimeError('Default control remains blocked')
+         version=call(CommandRequest.QUERY_VERSION)
+         if not version.acknowledged:raise RuntimeError('Version query not acknowledged')
+         enabled=call(CommandRequest.ENABLE,enabled=True)
+@@ -187,6 +200,7 @@
+         report['final_enabled']=states[-1][1].enabled if states else None
+         report['final_wheels']={str(m.channel):m.rpm for t,m in wheels if time.monotonic()-t<1}
+         report['imu_valid']=bool(imu_status and imu_status[-1][1].orientation_valid)
++        report['final_driver_diagnostics']={item.key:item.value for item in diagnostics[-1][1].status[0].values} if diagnostics else {}
+         report['telemetry_counts']={k:len(v) for k,v in [('state',states),('velocity',velocities),
+                            ('driver_motion',wheels),('driver_status',electrical),('odometry',odometry)]}
+         for proc in reversed(processes):stop_process(proc)

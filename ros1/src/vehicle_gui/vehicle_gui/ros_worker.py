@@ -14,7 +14,7 @@ from nav_msgs.msg import Odometry
 from sensor_msgs.msg import Imu
 from diagnostic_msgs.msg import DiagnosticArray
 from std_srvs.srv import Trigger, TriggerRequest
-from std_msgs.msg import UInt64
+from std_msgs.msg import Bool, UInt64
 from vehicle_interfaces.msg import (Acknowledgement, CanFrame, DriverMotion, DriverStatus,
     Faults, Heading, ImuCalibration, ImuStatus, MotionStatus, State, Version, WheelMileage)
 from vehicle_interfaces.srv import Command, CommandRequest, ExecuteMotion, ExecuteMotionRequest
@@ -72,6 +72,8 @@ class VehicleRosNode:
         self.subscribe(DriverStatus, self.topic("driver_status"), self.on_driver_status, 5)
         self.subscribe(Odometry, "odom", self.on_odom)
         self.subscribe(Heading, self.topic("heading"), self.on_heading)
+        self.subscribe(Bool, self.topic("imu_enabled"),
+            lambda m: store.update("imu_mode", {"enabled": m.data}), 1)
         self.subscribe(ImuCalibration, self.topic("imu_calibration"), self.on_calibration, 1)
         self.subscribe(MotionStatus, self.topic("motion_status"), self.on_motion_status, 1)
         self.subscribe(Imu, "imu/data", self.on_imu)
@@ -193,7 +195,9 @@ class VehicleRosNode:
         self.store.update("imu_status", {key: getattr(message, key) for key in
             ("online", "measurement_valid", "orientation_valid", "nmt_state", "faults",
              "sample_count", "quaternion_count", "measurement_age", "orientation_age",
-             "rx_frames", "malformed_frames", "error_frames", "dropped_frames", "message")})
+             "rx_frames", "malformed_frames", "error_frames", "dropped_frames", "message", "protocol", "device_metadata_available",
+             "heartbeat_valid", "acceleration_valid", "angular_velocity_valid", "magnetic_field_valid",
+             "received_measurements", "received_orientations")})
 
     def clear_odometry_display(self):
         # Queued pre-reset TCPROS samples must not reconnect the old path to the origin.

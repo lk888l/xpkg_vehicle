@@ -30,7 +30,8 @@ ImuSocketCan::ImuSocketCan(const std::string& interface, uint8_t node) {
     const int one = 1;
     if (::setsockopt(fd_, SOL_CAN_RAW, CAN_RAW_FD_FRAMES, &one, sizeof(one)) < 0) fail("IMU CAN FD");
     const canid_t mask = CAN_SFF_MASK | CAN_EFF_FLAG | CAN_RTR_FLAG;
-    const can_filter filters[] = {{0x180U + node, mask}, {0x280U + node, mask}, {0x700U + node, mask}};
+    const can_filter filters[] = {{0x180U + node, mask}, {0x280U + node, mask},
+                                  {0x380U + node, mask}, {0x480U + node, mask}, {0x700U + node, mask}};
     if (::setsockopt(fd_, SOL_CAN_RAW, CAN_RAW_FILTER, filters, sizeof(filters)) < 0) fail("IMU CAN filter");
     const can_err_mask_t errors = CAN_ERR_MASK;
     if (::setsockopt(fd_, SOL_CAN_RAW, CAN_RAW_ERR_FILTER, &errors, sizeof(errors)) < 0) fail("IMU CAN errors");

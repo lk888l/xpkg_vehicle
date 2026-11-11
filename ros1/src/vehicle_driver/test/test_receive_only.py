@@ -1,4 +1,4 @@
-"""Prove the default mode emits no chassis frames, even under active requests."""
+"""Prove explicit receive-only mode blocks all chassis frames and requests."""
 import os
 from pathlib import Path
 import signal
@@ -14,17 +14,19 @@ from vehicle_interfaces.msg import Heading, State
 from vehicle_interfaces.srv import Command, CommandRequest, ExecuteMotion, ExecuteMotionRequest
 from ros_test_support import RosProbe, executable, init_ros
 from test_integration import Emulator, ImuEmulator
+from test_shared_classic import ClassicImuEmulator
 
 
+@pytest.mark.parametrize("imu_type", [ImuEmulator, ClassicImuEmulator])
 @pytest.mark.parametrize("stamped", [True, False])
-def test_default_receive_only_blocks_all_commands_and_shutdown(tmp_path, stamped):
+def test_explicit_receive_only_blocks_all_commands_and_shutdown(tmp_path, stamped, imu_type):
     interface = os.environ.get("VEHICLE_TEST_CAN")
     if not interface:
         pytest.skip("Set VEHICLE_TEST_CAN to an isolated vcan interface")
     init_ros()
     chassis = Emulator(interface)  # The emulator verifies the kernel interface type.
     chassis.enabled, chassis.mode = True, 2
-    imu = ImuEmulator(interface)
+    imu = imu_type(interface)
     probe = RosProbe()
     states, headings, diagnostics = [], [], []
     probe.create_subscription(State, "/guard_vehicle/state", states.append, 10)
@@ -36,6 +38,7 @@ def test_default_receive_only_blocks_all_commands_and_shutdown(tmp_path, stamped
         try:
             processes.append(subprocess.Popen([
                 executable("vehicle_node"), "__name:=guard_vehicle", f"_can_interface:={interface}",
+                "_receive_only:=true",
                 "_auto_initialize:=true", "_auto_imu_calibration:=true", "_publish_tf:=false",
                 f"_use_stamped_cmd_vel:={str(stamped).lower()}", "cmd_vel:=guard_cmd_vel",
                 "imu/data:=guard_imu_data", "diagnostics:=guard_diagnostics",

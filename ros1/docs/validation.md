@@ -1,5 +1,7 @@
 # Noetic 移植与 Orin 验证记录
 
+以下是 2026-11-09 的历史记录，当时默认为只接收。2026-11-10 起默认改为允许实际控制，当前入口和操作步骤以 [README](../README.md) 为准；`tools/hardware_smoke.py` 继续显式使用只接收模式。
+
 日期：2026-11-09。目标：`orin@172.18.2.136`，工作区 `/home/orin/vehicle_noetic_ws`。
 
 ## 软件验收

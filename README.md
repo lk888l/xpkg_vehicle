@@ -1,6 +1,6 @@
 # MARK1_DIFF · ROS 2 Jazzy · SocketCAN
 
-ROS1 Noetic 移植版位于 [ros1/](ros1/README.md)，包含完整驱动、IMU、运动算法和控制台；默认禁止底盘发送，适用于当前 Orin 软件验证阶段。
+本工程优先使用 ROS2。ROS1 实机部署代码仅作存档，位于 [ros1/](ros1/README.md)，已于 2026-11-11 从 reComputer Mini J3011 同步；存档独立于 ROS2 源码，不参与默认构建。
 
 针对已接入 `can0` 的 MARK1_DIFF 重写的 ROS 2 工作空间。仅继承旧工程的 CAN 命令与字段定义，结合实测修正协议；不依赖 `xpkg_comm`、`xpkg_msgs`、ROS 1、串口桥、JSON 控制或旧里程学。
 

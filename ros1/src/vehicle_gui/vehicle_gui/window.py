@@ -221,7 +221,7 @@ class MainWindow(QMainWindow):
         self.stop_button = self._button("停止运动  /  空格", self.stop_controls, "stop", False)
         self.stop_button.setMinimumHeight(42)
         layout.addWidget(self.stop_button)
-        self.heading_hold = QCheckBox("直行时用 IMU 保持航向")
+        self.heading_hold = QCheckBox("直行时保持航向")
         self.heading_hold.setChecked(True)
         layout.addWidget(self.heading_hold)
         self.calibration_label = label("IMU 方向标定 · 等待驱动")
@@ -250,7 +250,7 @@ class MainWindow(QMainWindow):
         layout.addLayout(angle_row)
         self.turn_button = self._button("执行角度转向", self._start_turn)
         layout.addWidget(self.turn_button)
-        layout.addWidget(label("定距离前进 · IMU 保向", "section"))
+        layout.addWidget(label("定距离前进 · 航向保持", "section"))
         distance_row = QHBoxLayout()
         self.drive_distance = QDoubleSpinBox()
         self.drive_distance.setRange(0.01, 100)
@@ -309,6 +309,10 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.steering_label)
         layout.addSpacing(4)
         layout.addWidget(label("设备操作", "section"))
+        self.imu_mode_label = label("运行模式 · 等待驱动")
+        self.imu_mode_label.setWordWrap(True)
+        self.imu_mode_label.setToolTip("使能前通过 use_imu 启动参数选择；切换模式需停止并重启驱动")
+        layout.addWidget(self.imu_mode_label)
         enable_row = QHBoxLayout()
         self.enable_button = self._button("使能", lambda: self._command(3, enabled=True), "primary")
         self.disable_button = self._button("失能", lambda: self._command(3, enabled=False))
@@ -394,7 +398,7 @@ class MainWindow(QMainWindow):
         self.record_label = label("路径记录包含航向、控制目标与 IMU 状态")
         recording.addWidget(self.record_label, 1)
         layout.addLayout(recording)
-        self.imu_label = label("IMU · 等待 can1 姿态反馈")
+        self.imu_label = label("IMU · 等待驱动模式与姿态反馈")
         self.imu_label.setWordWrap(True)
         layout.addWidget(self.imu_label)
         self.pose_label = label("X —    Y —    航向 —    ·    等待里程计反馈")
@@ -496,11 +500,18 @@ class MainWindow(QMainWindow):
             self.steering.cancel()
             self.model.lease.stop()
 
+    def _imu_enabled(self):
+        sample = self.model.store.latest("imu_mode")
+        return sample.value["enabled"] if sample else None
+
     def _heading_feedback(self):
         sample = self.model.store.latest("heading")
-        if sample and sample.fresh(0.25) and sample.value["imu_active"] and \
-                0 <= sample.value["imu_age"] + sample.age() < 0.25:
-            return sample.value["yaw"], sample.value["wz"]
+        if sample and sample.fresh(0.25):
+            chassis_mode = self._imu_enabled() is False
+            imu_ready = sample.value["imu_active"] and \
+                0 <= sample.value["imu_age"] + sample.age() < 0.25
+            if chassis_mode or imu_ready:
+                return sample.value["yaw"], sample.value["wz"]
         return None, 0.0
 
     def _steering_state(self):
@@ -539,7 +550,8 @@ class MainWindow(QMainWindow):
     def _start_motion(self, mode, target):
         yaw, _ = self._heading_feedback()
         if yaw is None:
-            self.model.store.event("暂无有效 IMU 航向，无法执行自动运动；方向键仍可使用", "warning")
+            source = "底盘" if self._imu_enabled() is False else "IMU"
+            self.model.store.event(f"暂无有效{source}航向，无法执行自动运动；方向键仍可使用", "warning")
             return
         if self.angular.value() <= 0:
             self.model.store.event("请将旋转速度设为大于 0", "warning")
@@ -726,21 +738,31 @@ class MainWindow(QMainWindow):
                     imu and imu.fresh(0.25, now) and imu.value.get("valid"))
 
     def _update_imu_buttons(self):
+        imu_enabled = self._imu_enabled() is True
         sample = self.model.store.latest("imu_calibration")
         state = sample.value["state"] if sample else 0
         running = sample is not None and sample.fresh(0.5) and 1 <= state <= 6
-        self.calibration_button.setEnabled(not self.model.busy and not running)
+        self.calibration_button.setEnabled(imu_enabled and not self.model.busy and not running)
         self.calibration_button.setText(("标定等待中…" if state == 1 else "标定进行中…") if running else
                                          ("重新标定 IMU" if state >= 7 else "开始 IMU 标定"))
-        self.zero_imu_button.setEnabled(not self.model.busy and self._imu_orientation_available(
+        self.zero_imu_button.setEnabled(imu_enabled and not self.model.busy and self._imu_orientation_available(
             self.model.store.latest("imu_status"), self.model.store.latest("imu")))
 
     def refresh(self):
         now = time.monotonic()
         latest, history, frames, events, revision = self.model.store.snapshot()
         self._update_imu_buttons()
+        imu_enabled = self._imu_enabled()
+        if imu_enabled is not None:
+            self.imu_mode_label.setText("有 IMU 模式 · IMU 航向" if imu_enabled else
+                                       "无 IMU 模式 · 底盘反馈航向")
+            self.heading_hold.setText("直行时用 IMU 保持航向" if imu_enabled else
+                                      "直行时用底盘反馈保持航向")
         calibration = latest.get("imu_calibration")
-        if calibration:
+        if imu_enabled is False:
+            self.calibration_label.setText("无 IMU 模式 · 标定与 IMU 置零不可用")
+            self.calibration_label.setToolTip("定角、定距和保向使用底盘反馈积分；轮滑会产生航向误差")
+        elif calibration:
             c = calibration.value
             phases = {0: "自动标定关闭", 1: "等待底盘与 IMU", 2: "标定准备中", 3: "正转测量",
                       4: "停转等待", 5: "反转回位测量", 6: "检查双向结果", 7: "方向标定完成",
@@ -755,13 +777,18 @@ class MainWindow(QMainWindow):
                 f"\n正转 yaw 变化 {math.degrees(c['positive_delta']):+.2f}°，反转 {math.degrees(c['negative_delta']):+.2f}°")
         imu_status = latest.get("imu_status")
         imu = latest.get("imu")
-        if imu_status:
+        if imu_enabled is False:
+            self.imu_label.setText("IMU 已禁用 · 使用底盘里程计航向")
+            self.imu_label.setToolTip("启动时选择无 IMU 模式；外部 IMU 数据不参与控制")
+        elif imu_status:
             s = imu_status.value
             valid = self._imu_orientation_available(imu_status, imu, now)
             angles = ("   横滚 {:+.1f}°   俯仰 {:+.1f}°   IMU 相对航向 {:+.1f}°".format(
                 *(math.degrees(imu.value[k]) for k in ("roll", "pitch", "yaw"))) if valid else "")
+            faults = (f"故障 0x{s['faults']:X}" if s.get("device_metadata_available", True)
+                      else "设备故障字未提供")
             self.imu_label.setText(("IMU 姿态有效" if valid else "IMU 姿态不可用 · 使用底盘里程计") + angles +
-                                   f"   RX {s['rx_frames']}   故障 0x{s['faults']:X}")
+                                   f"   RX {s['rx_frames']}   {faults}")
             self.imu_label.setToolTip(s["message"])
         steering = self.steering
         status = latest.get("motion_status")

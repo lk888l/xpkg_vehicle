@@ -1,0 +1,113 @@
+{
+  "remote_workspace": "orin@172.18.7.207:/home/orin/vehicle_noetic_ws",
+  "receive_only_default": false,
+  "auto_initialize_default": false,
+  "auto_imu_calibration_default": false,
+  "core_tests": {
+    "tests": 34,
+    "failures": 0,
+    "errors": 0
+  },
+  "python_tests": {
+    "tests": 103,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "hardware_control_chain_passed": true,
+  "hardware_phases": [
+    {
+      "name": "forward",
+      "vx": 0.05,
+      "wz": 0,
+      "duration": 1.2,
+      "wheel_peak_abs_rpm": {
+        "0": 1082,
+        "1": 1086,
+        "2": 1087,
+        "3": 1088
+      },
+      "wheel_stopped": true,
+      "stop_command_delay_s": 0.07183419400007551
+    },
+    {
+      "name": "reverse",
+      "vx": -0.05,
+      "wz": 0,
+      "duration": 1.2,
+      "wheel_peak_abs_rpm": {
+        "0": 1067,
+        "1": 1087,
+        "2": 1070,
+        "3": 992
+      },
+      "wheel_stopped": true,
+      "stop_command_delay_s": 0.05385559499973169
+    },
+    {
+      "name": "left",
+      "vx": 0,
+      "wz": 0.15,
+      "duration": 1.2,
+      "wheel_peak_abs_rpm": {
+        "0": 1088,
+        "1": 1067,
+        "2": 1087,
+        "3": 1067
+      },
+      "wheel_stopped": true,
+      "stop_command_delay_s": 0.05172286400011217
+    },
+    {
+      "name": "right",
+      "vx": 0,
+      "wz": -0.15,
+      "duration": 1.2,
+      "wheel_peak_abs_rpm": {
+        "0": 1096,
+        "1": 1089,
+        "2": 1079,
+        "3": 1089
+      },
+      "wheel_stopped": true,
+      "stop_command_delay_s": 0.06946164200007843
+    },
+    {
+      "name": "watchdog",
+      "vx": 0.05,
+      "wz": 0,
+      "duration": 0.8,
+      "wheel_peak_abs_rpm": {
+        "0": 1087,
+        "1": 1086,
+        "2": 1044,
+        "3": 1082
+      },
+      "wheel_stopped": true,
+      "stop_command_delay_s": 0.3061219119999805
+    }
+  ],
+  "final_enabled": false,
+  "final_wheel_rpm": {
+    "0": 0,
+    "1": 0,
+    "2": 0,
+    "3": 0
+  },
+  "speed_accuracy_verified": false,
+  "speed_accuracy_note": "B2 reported peaks exceed requested velocities; separate diagnosis is required.",
+  "install_gui_smoke": {
+    "exit_code": 0,
+    "default_control_started": true,
+    "chassis_heading_started": true,
+    "local_command_counts": {
+      "0x12": 1,
+      "0x3": 1
+    },
+    "nonzero_velocity_frames": [],
+    "enable_true_frames": [],
+    "shutdown_disable_sent": true,
+    "success": true
+  },
+  "backup": "/home/orin/vehicle_noetic_ws/artifacts/default_control_backup_20261110_121149.tgz"
+}

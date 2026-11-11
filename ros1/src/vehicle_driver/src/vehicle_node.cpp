@@ -18,6 +18,7 @@
 #include <sensor_msgs/Imu.h>
 #include <std_srvs/Trigger.h>
 #include <std_msgs/UInt64.h>
+#include <std_msgs/Bool.h>
 #include <stdexcept>
 #include <string>
 #include <vehicle_core/control.hpp>
@@ -40,6 +41,7 @@
 #include <vehicle_interfaces/WheelMileage.h>
 #include <vehicle_interfaces/Command.h>
 #include <vehicle_interfaces/ExecuteMotion.h>
+#include "heading_policy.hpp"
 
 namespace vehicle_driver {
 namespace core = vehicle_core;
@@ -54,8 +56,8 @@ static double monotonic() {
 // separate queue and releases mutex_, so ACK waits never block CAN or the watchdog.
 class VehicleNode final {
  public:
-  VehicleNode() {
-    receive_only_ = parameter<bool>("receive_only", true);
+  VehicleNode() : heading_policy_(parameter<bool>("use_imu_heading", true)) {
+    receive_only_ = parameter<bool>("receive_only", false);
     interface_ = parameter<std::string>("can_interface", "can0");
     const int type = parameter<int>("device_type", 0xE1);
     const int node = parameter<int>("device_node", 1);
@@ -98,7 +100,6 @@ class VehicleNode final {
     if (wheel_odometry_ && (!std::isfinite(width) || width <= 0))
       throw std::invalid_argument("wheel_mileage requires calibrated effective_track_width > 0");
     odometry_ = std::make_unique<core::Odometry>(width);
-    use_imu_heading_ = parameter<bool>("use_imu_heading", true);
     imu_yaw_sign_ = parameter<int>("imu_yaw_sign", 1);
     if (imu_yaw_sign_ != 1 && imu_yaw_sign_ != -1)
       throw std::invalid_argument("imu_yaw_sign must be +1 or -1");
@@ -110,8 +111,9 @@ class VehicleNode final {
     calibration_config.settle_time = positive("imu_calibration_settle_time", 0.30);
     calibration_config.phase_timeout = positive("imu_calibration_phase_timeout", 3.0);
     calibration_ = std::make_unique<core::YawCalibration>(calibration_config);
-    auto_imu_calibration_ = parameter<bool>("auto_imu_calibration", false) && !receive_only_;
-    if (auto_imu_calibration_ && use_imu_heading_) calibration_->request();
+    auto_imu_calibration_ = parameter<bool>("auto_imu_calibration", false) &&
+                            heading_policy_.uses_imu() && !receive_only_;
+    if (auto_imu_calibration_) calibration_->request();
     odom_frame_ = parameter<std::string>("odom_frame", "odom");
     base_frame_ = parameter<std::string>("base_frame", "base_link");
     if (odom_frame_.empty() || base_frame_.empty() || odom_frame_ == base_frame_)
@@ -136,6 +138,12 @@ class VehicleNode final {
     faults_pub_ = private_.advertise<msg::Faults>("faults", 10);
     odom_pub_ = nh_.advertise<nav_msgs::Odometry>("odom", 10);
     heading_pub_ = private_.advertise<msg::Heading>("heading", 10);
+    // Publish the effective startup configuration, including for late GUI clients.
+    // ROS parameter edits cannot change the live policy or this latched value.
+    imu_enabled_pub_ = private_.advertise<std_msgs::Bool>("imu_enabled", 1, true);
+    std_msgs::Bool imu_enabled;
+    imu_enabled.data = heading_policy_.uses_imu();
+    imu_enabled_pub_.publish(imu_enabled);
     calibration_pub_ = private_.advertise<msg::ImuCalibration>("imu_calibration", 1, true);
     motion_pub_ = private_.advertise<msg::MotionStatus>("motion_status", 1, true);
     motion_service_ = private_.advertiseService("execute_motion", &VehicleNode::motion_request, this);
@@ -144,7 +152,7 @@ class VehicleNode final {
           std::lock_guard<std::mutex> guard(mutex_);
           if (m->data == motion_id_) motion_.keepalive(monotonic());
         });
-    if (use_imu_heading_) {
+    if (heading_policy_.uses_imu()) {
       imu_sub_ = nh_.subscribe<sensor_msgs::Imu>(
           "imu/data", 10, [this](sensor_msgs::Imu::ConstPtr m) {
           std::lock_guard<std::mutex> guard(mutex_);
@@ -194,6 +202,7 @@ class VehicleNode final {
     health_timer_ = nh_.createWallTimer(ros::WallDuration(0.5), [this](const ros::WallTimerEvent&) {
       std::lock_guard<std::mutex> guard(mutex_); health_tick(); });
     ROS_INFO("Chassis receive_only=%s", receive_only_ ? "true" : "false");
+    ROS_INFO("Heading policy=%s (fixed until node restart)", heading_policy_.name());
     publish_calibration();
     publish_motion_status(true);
     ROS_INFO( "SocketCAN %s, vehicle ID 0x%08X, odometry=%s, cmd_vel=%s",
@@ -374,8 +383,9 @@ class VehicleNode final {
   bool motion_ready(double tick) const {
     return transport_ && heartbeat_time_ && tick - *heartbeat_time_ < heartbeat_timeout_ &&
         state_.enabled && status_time_ && tick - *status_time_ < 0.5 && state_.mode == 2 &&
-        state_.work_state == 0 && odom_time_ && tick - *odom_time_ < 0.25 &&
-        odometry_->heading_fresh(tick) && !calibration_->pending();
+        state_.work_state == 0 && heading_policy_.ready(
+            odom_time_ && tick >= *odom_time_ && tick - *odom_time_ < 0.25,
+            odometry_->heading_fresh(tick)) && !calibration_->pending();
   }
   void execute_motion(const MotionService::Request& request, MotionService::Response& response) {
     response.goal_id = motion_id_;
@@ -394,7 +404,7 @@ class VehicleNode final {
       return;
     }
     if (!motion_ready(monotonic())) {
-      response.message = "需要已使能的 CAN 模式、新鲜里程计与已就绪的 IMU 航向；标定期间不能执行";
+      response.message = heading_policy_.requirements();
       return;
     }
     try {
@@ -482,7 +492,9 @@ class VehicleNode final {
     m.active = calibration_->active(); m.calibrated = imu_yaw_calibrated_;
     m.yaw_sign = static_cast<int8_t>(imu_yaw_sign_);
     m.positive_delta = calibration_->positive_delta(); m.negative_delta = calibration_->negative_delta();
-    m.command_yaw_rate = calibration_->command(); m.message = calibration_->message();
+    m.command_yaw_rate = calibration_->command();
+    m.message = heading_policy_.uses_imu() ? calibration_->message() :
+        "IMU disabled at startup; heading uses chassis odometry";
     calibration_pub_.publish(m);
     if (changed) ROS_INFO( "IMU calibration: %s", m.message.c_str());
     last_calibration_state_ = calibration_->state();
@@ -678,10 +690,11 @@ class VehicleNode final {
   }
   bool calibrate_imu(std_srvs::Trigger::Request&, std_srvs::Trigger::Response& response) {
     std::lock_guard<std::mutex> guard(mutex_);
-    if (receive_only_ || !use_imu_heading_ || calibration_->pending()) {
+    if (receive_only_ || !heading_policy_.uses_imu() || calibration_->pending()) {
       response.success = false;
       response.message = receive_only_ ? "receive_only is enabled; rotation calibration is prohibited" :
-          !use_imu_heading_ ? "use_imu_heading is disabled" : "Calibration already pending or active";
+          !heading_policy_.uses_imu() ? "use_imu_heading is disabled (use_imu:=false)" :
+                                      "Calibration already pending or active";
       return true;
     }
     commands_->stop();
@@ -862,6 +875,8 @@ class VehicleNode final {
     value("rejected_commands", rejected_commands_);
     value("command_active", commands_->active(tick));
     value("odometry_discontinuities", odometry_->discontinuities());
+    value("imu_enabled", heading_policy_.uses_imu());
+    value("motion_feedback_ready", motion_ready(tick));
     value("imu_heading_active", odometry_->heading_fresh(tick));
     value("imu_heading_age_s", odometry_->heading_age(tick));
     value("imu_yaw_sign", imu_yaw_sign_);
@@ -875,7 +890,7 @@ class VehicleNode final {
   ros::AsyncSpinner command_spinner_{2, &command_queue_};
   std::mutex mutex_;
   std::condition_variable pending_changed_;
-  bool receive_only_{true}, shutting_down_{};
+  bool receive_only_{false}, shutting_down_{};
   double max_linear_speed_{}, max_angular_speed_{};
   uint64_t blocked_transmissions_{};
   core::Address address_;
@@ -897,7 +912,8 @@ class VehicleNode final {
   std::optional<double> odom_time_;
   std::unique_ptr<core::Odometry> odometry_;
   std::unique_ptr<core::YawCalibration> calibration_;
-  bool use_imu_heading_{}, imu_yaw_calibrated_{}, auto_imu_calibration_{};
+  const HeadingPolicy heading_policy_;
+  bool imu_yaw_calibrated_{}, auto_imu_calibration_{};
   int imu_yaw_sign_{1};
   std::optional<double> raw_imu_yaw_, raw_imu_time_;
   std::optional<core::YawCalibration::State> last_calibration_state_;
@@ -919,6 +935,7 @@ class VehicleNode final {
   ros::Publisher faults_pub_;
   ros::Publisher odom_pub_;
   ros::Publisher heading_pub_;
+  ros::Publisher imu_enabled_pub_;
   ros::Publisher calibration_pub_;
   ros::Publisher motion_pub_;
   ros::Publisher diagnostics_pub_;

@@ -1,0 +1,56 @@
+{
+  "utc": "2026-11-09T13:00:13.237522+00:00",
+  "interface": "can0",
+  "use_imu": false,
+  "requested_motion": "zero targets only",
+  "commands": [
+    {
+      "command": 2,
+      "sent": true,
+      "acknowledged": true,
+      "state_confirmed": true,
+      "message": "ASCII A2 version received"
+    },
+    {
+      "command": 3,
+      "enabled": true,
+      "sent": true,
+      "acknowledged": true,
+      "state_confirmed": true,
+      "message": "A3 received and new B0 enabled state matched"
+    },
+    {
+      "command": 17,
+      "mode": 2,
+      "beep": false,
+      "sent": true,
+      "acknowledged": false,
+      "state_confirmed": true,
+      "message": "New B1 mode/beep matched; brake and special-function effects remain unverified"
+    },
+    {
+      "command": 3,
+      "enabled": false,
+      "sent": true,
+      "acknowledged": true,
+      "state_confirmed": true,
+      "message": "A3 received and new B0 enabled state matched"
+    }
+  ],
+  "initial_enabled": false,
+  "version": [
+    "001v",
+    "001v"
+  ],
+  "original_mode": 2,
+  "success": false,
+  "error": "Chassis is not stationary",
+  "final_disabled_confirmed": true,
+  "local_command_counts": {
+    "0x2": 1,
+    "0x12": 9,
+    "0x3": 3,
+    "0x11": 1
+  },
+  "nonzero_motion_frames": []
+}

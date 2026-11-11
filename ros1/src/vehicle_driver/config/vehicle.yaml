@@ -1,9 +1,14 @@
-# Default: observe only; no chassis frames, including shutdown frames.
-receive_only: true
+# Control is available by default; enable and CAN mode remain explicit operations.
+# Set true for passive observation with no chassis frames, including on shutdown.
+receive_only: false
 can_interface: can0
-imu_can_interface: can1
+imu_can_interface: can0
+# Updated four-PDO firmware, sharing 500 kbit/s Classic CAN with the chassis.
+imu_protocol: classic
 imu_node_id: 31
 imu_auto_start: true
+# Startup-only heading policy. Launch entry points set this via use_imu:=true|false.
+# false: no IMU subscription/calibration; motion uses fresh chassis odometry.
 use_imu_heading: true
 # On startup, rotate in place in both directions to identify the IMU yaw sign.
 auto_imu_calibration: false

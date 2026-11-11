@@ -1,0 +1,22 @@
+[
+  {
+    "bitrate": 500000,
+    "counts": {},
+    "last_payloads": {}
+  },
+  {
+    "bitrate": 1000000,
+    "counts": {},
+    "last_payloads": {}
+  },
+  {
+    "bitrate": 250000,
+    "counts": {},
+    "last_payloads": {}
+  },
+  {
+    "bitrate": 125000,
+    "counts": {},
+    "last_payloads": {}
+  }
+]

@@ -1,0 +1,11 @@
+{
+  "package_path": "/home/orin/vehicle_noetic_ws/install/share/vehicle_driver",
+  "nodes": [
+    "/install_check/vehicle",
+    "/install_check/vehicle_gui"
+  ],
+  "exit_code": 0,
+  "chassis_policy_started": true,
+  "can0_tx_delta": 0,
+  "success": true
+}

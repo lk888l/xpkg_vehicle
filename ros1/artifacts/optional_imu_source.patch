@@ -1,0 +1,884 @@
+diff --git a/README.md b/README.md
+--- a/README.md
++++ b/README.md
+@@ -2,7 +2,48 @@
+ 
+ 原工程的 Noetic 移植工作区。保留底盘 CAN 协议、IMU CAN-FD 协议、全部遥测字段、里程计、TF、方向标定、定角/定距运动和 PyQt5 控制台。ROS2 源码及原有未提交修改保留在上级目录。
+ 
+-已部署到 `orin@172.18.2.136:/home/orin/vehicle_noetic_ws`。默认底盘接口 `can0`，IMU 接口 `can1`、节点号 31。实际验证情况见 [Orin 验证记录](docs/validation.md)。
++已部署到 `orin@172.18.2.136:/home/orin/vehicle_noetic_ws`。默认底盘接口 `can0`，IMU 使用共享 `can0` 上的 Classic CAN 四 PDO 协议、节点号 31；独立 CAN-FD IMU 可显式选择接口和协议。实际验证情况见 [Orin 验证记录](docs/validation.md)。
++
++## 使能前选择有无 IMU
++
++统一入口是 `use_imu:=true|false`，驱动启动时固定，改变模式需先失能、结束该 launch，再以新参数启动。参数默认 `true`，保留已有有 IMU 行为。没有运行时模式切换服务，`rosparam set` 不会修改已运行驱动的策略。
++
++```bash
++cd /home/orin/vehicle_noetic_ws
++# 当前仅连接 can0 底盘、未连接 IMU：
++bash tools/run.sh gui use_imu:=false
++# 允许通过界面使能、设置 CAN 模式和运动，启动时仍不自动使能：
++bash tools/run.sh gui use_imu:=false receive_only:=false
++# 无界面运行，仍由 /vehicle/command 显式使能和设置模式：
++bash tools/run.sh driver use_imu:=false receive_only:=false
++# 接入 IMU 后选择：
++bash tools/run.sh gui use_imu:=true receive_only:=false
++```
++
++| 行为 | `use_imu:=true` | `use_imu:=false` |
++|---|---|---|
++| IMU 节点 / 航向订阅 | 默认启动并订阅 | 不启动、不订阅，忽略其他节点发布的 IMU |
++| 自动定角、定距、键盘保向 | 新鲜底盘里程计与 IMU 航向 | 新鲜底盘里程计航向 |
++| IMU 标定 / 姿态置零 | 保留 | 不发起自动标定；标定服务拒绝，界面两个按钮禁用 |
++| 反馈超时 | 自动运动停止，IMU 恢复后不自动续跑 | 自动运动停止，底盘反馈恢复后不自动续跑 |
++| 普通手动控制 | 保留 | 保留 |
++
++无 IMU 时默认依据 B2 实测速度与角速度积分，支持相同的定角、定距 API，但轮滑、反馈偏差会积累成位置和航向误差，不代表与 IMU 相同的实车精度。`odom_source=wheel_mileage` 仍需校准 `effective_track_width`。
++
++2026-11-09 实机测试发现：发送全零速度时，B2 仍报告较大速度波动，因此本次没有执行实车定角/定距目标，结束已确认失能。应先排查底盘实际轮动 / 编码器反馈，再验收运动精度；详细数值和原始记录见 [可选 IMU 验证结果](docs/optional-imu.md#2026-11-09-orin-验证结果)。
++
++`start_imu` 只决定是否由本 launch 启动传感器进程：已有外部 IMU 时用 `use_imu:=true start_imu:=false`；单独设置 `start_imu:=false` **不代表**无 IMU 模式。`use_imu:=false` 始终禁止此 launch 启动 IMU。GUI 读取驱动发布的 latched `/vehicle/imu_enabled`，附着已有驱动时不会用 GUI 参数覆盖驱动配置。直接 `rosrun vehicle_driver vehicle_node` 时对应私有参数为 `_use_imu_heading:=false`；launch 中以 `use_imu` 覆盖 YAML 的该字段。
++
++无 IMU 实机只读检查：
++
++```bash
++source /opt/ros/noetic/setup.bash
++source devel/setup.bash
++python3 tools/hardware_smoke.py --use-imu false --can-interface can0 \
++  --output artifacts/no_imu_hardware.json
++```
++
++设计和验证说明见 [可选 IMU 架构](docs/optional-imu.md)。
+ 
+ ## 本阶段的启动方式
+ 
+@@ -80,6 +121,7 @@
+ | `/vehicle/remote`、`/vehicle/sensors`、`/vehicle/faults` | `vehicle_interfaces/Remote`、`Sensors`、`Faults` | 保留原始字段和原有未验证范围 |
+ | `/vehicle/acknowledgements`、`/vehicle/can_rx` | `vehicle_interfaces/Acknowledgement`、`CanFrame` | 设备 ACK 和筛选后的接收帧 |
+ | `/vehicle/heading` | `vehicle_interfaces/Heading` | 与里程计同步的航向和来源 |
++| `/vehicle/imu_enabled` | `std_msgs/Bool` | latched，实际生效的固定 IMU 运行模式；false 表示底盘航向策略 |
+ | `/vehicle/imu_calibration`、`/vehicle/motion_status` | `vehicle_interfaces/ImuCalibration`、`MotionStatus` | latched，约 10 Hz 及状态切换时发布 |
+ | `/vehicle/motion_keepalive` | `std_msgs/UInt64` | 自动运动目标 ID 续期 |
+ | `/imu/data`、`/imu/raw` | `sensor_msgs/Imu` | 姿态及原始惯性量，缺测协方差首项为 -1 |
+diff --git a/docs/optional-imu.md b/docs/optional-imu.md
+--- /dev/null
++++ b/docs/optional-imu.md
+@@ -0,0 +1,44 @@
++# 可选 IMU：启动时选择航向策略
++
++## 决策
++
++两种配置共用协议解析、里程计和 `MotionController`。`HeadingPolicy` 是值类型的轻量策略模式：只封装所需反馈来源、就绪条件和拒绝原因；驱动在构造时注入配置，保存为 `const`，整个进程生命周期不变。当前只有两种稳定策略，无需虚函数继承层次、插件系统或运行时状态机。
++
++- `vehicle.launch` 是唯一驱动组合入口，GUI 通过 include 复用，避免两套参数分叉。`use_imu` 同时决定 IMU 进程是否启动及底盘是否使用 IMU 航向，非法布尔值在启动节点前被拒绝。
++- `Odometry` 提供统一位姿；无 IMU 时已有的 B2 积分或经校准的 B3 轮里程计直接提供航向。
++- `MotionController` 只消费位姿和反馈就绪条件，不区分传感器类型。
++- `/vehicle/imu_enabled`（`std_msgs/Bool`，latched）公布实际生效的固定策略。GUI 即使后连接也能获知；不通过猜测“有没有收到 IMU”选择模式。
++- `/diagnostics` 新增 `imu_enabled`、`motion_feedback_ready`。`Heading.imu_active` 仍仅表示实际使用新鲜 IMU，不能用它代替所选运行模式。
++
++有 IMU 配置在 IMU 丢失后，里程计保留原有底盘积分回退，自动运动仍停止并要求重新下达目标。无 IMU 配置从不订阅 IMU，也不因 IMU 恢复而切换航向来源。两者都要求使能、CAN 模式、正常工作状态和新鲜底盘里程计；保留反馈超时、命令超时和 GUI 目标续期保护。
++
++## 操作契约
++
++先失能并退出本驱动，使用 `use_imu:=false` 或 `use_imu:=true` 重新启动，再使能。没有运行时修改接口。ROS1 参数服务器只是启动输入，启动后的 `rosparam set` 不生效，GUI 持续以驱动发布的生效值为准。
++
++`receive_only=true`、`auto_initialize=false`、`auto_imu_calibration=false` 的原默认值保留。无 IMU 模式即使残留 `auto_imu_calibration=true` 也不会请求方向标定。`start_imu=false` 用于外部 IMU 驱动，只有 `use_imu=false` 才选择无 IMU 策略。
++
++无 IMU 的定角和定距精度取决于底盘速度 / 轮里程计精度及轮滑；应按实际地面测量后再调整容差。底盘失能时当前设备只发 B0 心跳，尚无 B1/B2 时界面能正确显示“无 IMU 模式”，但不会凭空产生可用航向或接受自动运动。
++
++## 验证
++
++`sudo bash tools/test.sh` 在隔离 vcan 与独立 ROS master 上运行：
++
++- 两个 launch 入口、两种模式、是否自行启动 IMU 的组合及 GUI 单独附着。
++- 无 IMU 的相对转角、绝对航向、定距完成；外部 IMU 被忽略，修改参数不切换策略。
++- 底盘里程计过期、失能、模式改变、故障和目标续期超时均停止；恢复后不自行续跑。
++- GUI 显示模式、禁用 IMU 专属操作、通过底盘航向执行定角/定距/键盘保向。
++- 原有 IMU CAN-FD / Classic、标定、失效行为、只接收零发送和 GUI 回归测试。
++
++`tools/hardware_smoke.py --use-imu false` 在实机执行只读启动/退出检查，不要求存在 IMU 服务。具体测试结果和实机证据见 `artifacts/optional_imu_*`。
++
++## 2026-11-09 Orin 验证结果
++
++- 原生 ARM64 / Noetic 编译及 `install` 更新通过。
++- 完整回归：34 个独立 C++ gtest、90 个 Python/ROS/GUI 用例通过，零失败、零跳过；catkin 汇总显示 68 是同一核心结果被重复计数，以 gtest XML 的 34 为准。PyQtGraph 有既有的 Python 3.8 弃用警告。
++- 无 IMU 只读实机检查：can0 底盘在线且失能，GUI 正常，`imu_enabled=false`，没有 IMU 节点；启动、关闭 GUI、退出全过程 CAN TX 增量为 0。
++- 静态协议检查：真实设备 `001v / 001v` 的查询、使能、CAN 模式设置和最终失能均获得协议 / 状态确认；IMU 禁用时 `motion_feedback_ready=1`，说明无 IMU 路径能接收并使用实际底盘反馈。
++- 实车自动运动未通过验收：持续发送全零速度的采样期间，B2 报告的速度峰值为 `|vx|=0.524 m/s`、`|wz|=1.264 rad/s`。监测到的 161 个本机速度帧全部为零。测试因反馈超过静态阈值而中止，没有提交定角或定距目标，随后确认底盘失能。软件记录不能区分真实轮动与底盘反馈错误，需要检查底盘驱动器 / 编码器及反馈后再做实车运动精度验证；不对反馈增加掩盖问题的死区。
++- 有 IMU 路径通过虚拟 CAN 的 Classic / FD、标定及失效回归；本次未连接实物 IMU，未宣称通过实物 IMU 验证。
++
++原始记录：`artifacts/optional_imu_hardware_readonly.json`、`artifacts/optional_imu_hardware_stationary.json`、`artifacts/optional_imu_console.png`。部署前备份：`artifacts/optional_imu_backup_20261109_205617.tgz`。
+diff --git a/src/vehicle_core/src/motion_controller.cpp b/src/vehicle_core/src/motion_controller.cpp
+--- a/src/vehicle_core/src/motion_controller.cpp
++++ b/src/vehicle_core/src/motion_controller.cpp
+@@ -67,7 +67,7 @@
+ }
+ std::optional<Motion> MotionController::tick(const Pose& pose, double now, bool feedback_ready) {
+   if (active()) {
+-    if (!feedback_ready || !valid_pose(pose)) fail("底盘或 IMU / 里程计反馈无效，已停止");
++    if (!feedback_ready || !valid_pose(pose)) fail("底盘或所选航向 / 里程计反馈无效，已停止");
+     else if (!std::isfinite(now) || now < started_ || now - started_ >= config_.timeout)
+       fail("运动执行超时，已停止");
+     else if (client_timeout_ > 0 && now - last_keepalive_ >= client_timeout_)
+diff --git a/src/vehicle_driver/config/vehicle.yaml b/src/vehicle_driver/config/vehicle.yaml
+--- a/src/vehicle_driver/config/vehicle.yaml
++++ b/src/vehicle_driver/config/vehicle.yaml
+@@ -6,6 +6,8 @@
+ imu_protocol: classic
+ imu_node_id: 31
+ imu_auto_start: true
++# Startup-only heading policy. Launch entry points set this via use_imu:=true|false.
++# false: no IMU subscription/calibration; motion uses fresh chassis odometry.
+ use_imu_heading: true
+ # On startup, rotate in place in both directions to identify the IMU yaw sign.
+ auto_imu_calibration: false
+diff --git a/src/vehicle_driver/launch/vehicle.launch b/src/vehicle_driver/launch/vehicle.launch
+--- a/src/vehicle_driver/launch/vehicle.launch
++++ b/src/vehicle_driver/launch/vehicle.launch
+@@ -4,22 +4,25 @@
+   <arg name="can_interface" default="can0"/>
+   <arg name="imu_can_interface" default="$(arg can_interface)"/>
+   <arg name="imu_protocol" default="classic"/>
+-  <arg name="start_imu" default="true"/>
++  <arg name="use_imu" default="true" doc="Select IMU or chassis heading before enabling; restart to change"/>
++  <arg name="start_driver" default="true"/>
++  <arg name="start_imu" default="$(arg use_imu)"/>
+   <arg name="receive_only" default="true"/>
+   <arg name="auto_initialize" default="false"/>
+   <arg name="auto_imu_calibration" default="false"/>
+   <arg name="use_stamped_cmd_vel" default="true"/>
+   <arg name="imu_auto_start" default="true"/>
+   <group ns="$(arg namespace)">
+-    <node pkg="vehicle_driver" type="imu_node" name="imu" output="screen" if="$(arg start_imu)">
++    <node pkg="vehicle_driver" type="imu_node" name="imu" output="screen" if="$(eval arg('use_imu') and arg('start_imu'))">
+       <rosparam command="load" file="$(arg config)"/>
+       <param name="imu_can_interface" value="$(arg imu_can_interface)"/>
+       <param name="imu_protocol" value="$(arg imu_protocol)"/>
+       <param name="imu_auto_start" value="$(arg imu_auto_start)"/>
+     </node>
+-    <node pkg="vehicle_driver" type="vehicle_node" name="vehicle" output="screen">
++    <node pkg="vehicle_driver" type="vehicle_node" name="vehicle" output="screen" if="$(arg start_driver)">
+       <rosparam command="load" file="$(arg config)"/>
+       <param name="can_interface" value="$(arg can_interface)"/>
++      <param name="use_imu_heading" type="bool" value="$(arg use_imu)"/>
+       <param name="receive_only" value="$(arg receive_only)"/>
+       <param name="auto_initialize" value="$(arg auto_initialize)"/>
+       <param name="auto_imu_calibration" value="$(arg auto_imu_calibration)"/>
+diff --git a/src/vehicle_driver/src/heading_policy.hpp b/src/vehicle_driver/src/heading_policy.hpp
+--- /dev/null
++++ b/src/vehicle_driver/src/heading_policy.hpp
+@@ -0,0 +1,23 @@
++// SPDX-License-Identifier: Apache-2.0
++#pragma once
++
++namespace vehicle_driver {
++// A value-based Strategy selected once at startup. Odometry and motion control
++// remain sensor-agnostic; this policy owns their feedback prerequisites.
++class HeadingPolicy final {
++ public:
++  explicit constexpr HeadingPolicy(bool use_imu) : use_imu_(use_imu) {}
++  constexpr bool uses_imu() const { return use_imu_; }
++  constexpr bool ready(bool odometry_fresh, bool imu_fresh) const {
++    return odometry_fresh && (!use_imu_ || imu_fresh);
++  }
++  const char* name() const { return use_imu_ ? "imu" : "chassis"; }
++  const char* requirements() const {
++    return use_imu_ ? "需要已使能的 CAN 模式、新鲜里程计与已就绪的 IMU 航向；标定期间不能执行" :
++                      "需要已使能的 CAN 模式和新鲜底盘里程计";
++  }
++
++ private:
++  const bool use_imu_;
++};
++}  // namespace vehicle_driver
+diff --git a/src/vehicle_driver/src/vehicle_node.cpp b/src/vehicle_driver/src/vehicle_node.cpp
+--- a/src/vehicle_driver/src/vehicle_node.cpp
++++ b/src/vehicle_driver/src/vehicle_node.cpp
+@@ -18,6 +18,7 @@
+ #include <sensor_msgs/Imu.h>
+ #include <std_srvs/Trigger.h>
+ #include <std_msgs/UInt64.h>
++#include <std_msgs/Bool.h>
+ #include <stdexcept>
+ #include <string>
+ #include <vehicle_core/control.hpp>
+@@ -40,6 +41,7 @@
+ #include <vehicle_interfaces/WheelMileage.h>
+ #include <vehicle_interfaces/Command.h>
+ #include <vehicle_interfaces/ExecuteMotion.h>
++#include "heading_policy.hpp"
+ 
+ namespace vehicle_driver {
+ namespace core = vehicle_core;
+@@ -54,7 +56,7 @@
+ // separate queue and releases mutex_, so ACK waits never block CAN or the watchdog.
+ class VehicleNode final {
+  public:
+-  VehicleNode() {
++  VehicleNode() : heading_policy_(parameter<bool>("use_imu_heading", true)) {
+     receive_only_ = parameter<bool>("receive_only", true);
+     interface_ = parameter<std::string>("can_interface", "can0");
+     const int type = parameter<int>("device_type", 0xE1);
+@@ -98,7 +100,6 @@
+     if (wheel_odometry_ && (!std::isfinite(width) || width <= 0))
+       throw std::invalid_argument("wheel_mileage requires calibrated effective_track_width > 0");
+     odometry_ = std::make_unique<core::Odometry>(width);
+-    use_imu_heading_ = parameter<bool>("use_imu_heading", true);
+     imu_yaw_sign_ = parameter<int>("imu_yaw_sign", 1);
+     if (imu_yaw_sign_ != 1 && imu_yaw_sign_ != -1)
+       throw std::invalid_argument("imu_yaw_sign must be +1 or -1");
+@@ -110,8 +111,9 @@
+     calibration_config.settle_time = positive("imu_calibration_settle_time", 0.30);
+     calibration_config.phase_timeout = positive("imu_calibration_phase_timeout", 3.0);
+     calibration_ = std::make_unique<core::YawCalibration>(calibration_config);
+-    auto_imu_calibration_ = parameter<bool>("auto_imu_calibration", false) && !receive_only_;
+-    if (auto_imu_calibration_ && use_imu_heading_) calibration_->request();
++    auto_imu_calibration_ = parameter<bool>("auto_imu_calibration", false) &&
++                            heading_policy_.uses_imu() && !receive_only_;
++    if (auto_imu_calibration_) calibration_->request();
+     odom_frame_ = parameter<std::string>("odom_frame", "odom");
+     base_frame_ = parameter<std::string>("base_frame", "base_link");
+     if (odom_frame_.empty() || base_frame_.empty() || odom_frame_ == base_frame_)
+@@ -136,6 +138,12 @@
+     faults_pub_ = private_.advertise<msg::Faults>("faults", 10);
+     odom_pub_ = nh_.advertise<nav_msgs::Odometry>("odom", 10);
+     heading_pub_ = private_.advertise<msg::Heading>("heading", 10);
++    // Publish the effective startup configuration, including for late GUI clients.
++    // ROS parameter edits cannot change the live policy or this latched value.
++    imu_enabled_pub_ = private_.advertise<std_msgs::Bool>("imu_enabled", 1, true);
++    std_msgs::Bool imu_enabled;
++    imu_enabled.data = heading_policy_.uses_imu();
++    imu_enabled_pub_.publish(imu_enabled);
+     calibration_pub_ = private_.advertise<msg::ImuCalibration>("imu_calibration", 1, true);
+     motion_pub_ = private_.advertise<msg::MotionStatus>("motion_status", 1, true);
+     motion_service_ = private_.advertiseService("execute_motion", &VehicleNode::motion_request, this);
+@@ -144,7 +152,7 @@
+           std::lock_guard<std::mutex> guard(mutex_);
+           if (m->data == motion_id_) motion_.keepalive(monotonic());
+         });
+-    if (use_imu_heading_) {
++    if (heading_policy_.uses_imu()) {
+       imu_sub_ = nh_.subscribe<sensor_msgs::Imu>(
+           "imu/data", 10, [this](sensor_msgs::Imu::ConstPtr m) {
+           std::lock_guard<std::mutex> guard(mutex_);
+@@ -194,6 +202,7 @@
+     health_timer_ = nh_.createWallTimer(ros::WallDuration(0.5), [this](const ros::WallTimerEvent&) {
+       std::lock_guard<std::mutex> guard(mutex_); health_tick(); });
+     ROS_INFO("Chassis receive_only=%s", receive_only_ ? "true" : "false");
++    ROS_INFO("Heading policy=%s (fixed until node restart)", heading_policy_.name());
+     publish_calibration();
+     publish_motion_status(true);
+     ROS_INFO( "SocketCAN %s, vehicle ID 0x%08X, odometry=%s, cmd_vel=%s",
+@@ -374,8 +383,9 @@
+   bool motion_ready(double tick) const {
+     return transport_ && heartbeat_time_ && tick - *heartbeat_time_ < heartbeat_timeout_ &&
+         state_.enabled && status_time_ && tick - *status_time_ < 0.5 && state_.mode == 2 &&
+-        state_.work_state == 0 && odom_time_ && tick - *odom_time_ < 0.25 &&
+-        odometry_->heading_fresh(tick) && !calibration_->pending();
++        state_.work_state == 0 && heading_policy_.ready(
++            odom_time_ && tick >= *odom_time_ && tick - *odom_time_ < 0.25,
++            odometry_->heading_fresh(tick)) && !calibration_->pending();
+   }
+   void execute_motion(const MotionService::Request& request, MotionService::Response& response) {
+     response.goal_id = motion_id_;
+@@ -394,7 +404,7 @@
+       return;
+     }
+     if (!motion_ready(monotonic())) {
+-      response.message = "需要已使能的 CAN 模式、新鲜里程计与已就绪的 IMU 航向；标定期间不能执行";
++      response.message = heading_policy_.requirements();
+       return;
+     }
+     try {
+@@ -482,7 +492,9 @@
+     m.active = calibration_->active(); m.calibrated = imu_yaw_calibrated_;
+     m.yaw_sign = static_cast<int8_t>(imu_yaw_sign_);
+     m.positive_delta = calibration_->positive_delta(); m.negative_delta = calibration_->negative_delta();
+-    m.command_yaw_rate = calibration_->command(); m.message = calibration_->message();
++    m.command_yaw_rate = calibration_->command();
++    m.message = heading_policy_.uses_imu() ? calibration_->message() :
++        "IMU disabled at startup; heading uses chassis odometry";
+     calibration_pub_.publish(m);
+     if (changed) ROS_INFO( "IMU calibration: %s", m.message.c_str());
+     last_calibration_state_ = calibration_->state();
+@@ -678,10 +690,11 @@
+   }
+   bool calibrate_imu(std_srvs::Trigger::Request&, std_srvs::Trigger::Response& response) {
+     std::lock_guard<std::mutex> guard(mutex_);
+-    if (receive_only_ || !use_imu_heading_ || calibration_->pending()) {
++    if (receive_only_ || !heading_policy_.uses_imu() || calibration_->pending()) {
+       response.success = false;
+       response.message = receive_only_ ? "receive_only is enabled; rotation calibration is prohibited" :
+-          !use_imu_heading_ ? "use_imu_heading is disabled" : "Calibration already pending or active";
++          !heading_policy_.uses_imu() ? "use_imu_heading is disabled (use_imu:=false)" :
++                                      "Calibration already pending or active";
+       return true;
+     }
+     commands_->stop();
+@@ -862,6 +875,8 @@
+     value("rejected_commands", rejected_commands_);
+     value("command_active", commands_->active(tick));
+     value("odometry_discontinuities", odometry_->discontinuities());
++    value("imu_enabled", heading_policy_.uses_imu());
++    value("motion_feedback_ready", motion_ready(tick));
+     value("imu_heading_active", odometry_->heading_fresh(tick));
+     value("imu_heading_age_s", odometry_->heading_age(tick));
+     value("imu_yaw_sign", imu_yaw_sign_);
+@@ -897,7 +912,8 @@
+   std::optional<double> odom_time_;
+   std::unique_ptr<core::Odometry> odometry_;
+   std::unique_ptr<core::YawCalibration> calibration_;
+-  bool use_imu_heading_{}, imu_yaw_calibrated_{}, auto_imu_calibration_{};
++  const HeadingPolicy heading_policy_;
++  bool imu_yaw_calibrated_{}, auto_imu_calibration_{};
+   int imu_yaw_sign_{1};
+   std::optional<double> raw_imu_yaw_, raw_imu_time_;
+   std::optional<core::YawCalibration::State> last_calibration_state_;
+@@ -919,6 +935,7 @@
+   ros::Publisher faults_pub_;
+   ros::Publisher odom_pub_;
+   ros::Publisher heading_pub_;
++  ros::Publisher imu_enabled_pub_;
+   ros::Publisher calibration_pub_;
+   ros::Publisher motion_pub_;
+   ros::Publisher diagnostics_pub_;
+diff --git a/src/vehicle_driver/test/test_integration.py b/src/vehicle_driver/test/test_integration.py
+--- a/src/vehicle_driver/test/test_integration.py
++++ b/src/vehicle_driver/test/test_integration.py
+@@ -46,6 +46,7 @@
+         self.work_state = 0
+         self.commands = []
+         self.motion_response = False
++        self.motion_feedback = True
+         self.requested_motion = (0, 0, 0)
+         self.motion_time = 0.0
+         self.running = True
+@@ -94,7 +95,8 @@
+                 deadline = time.monotonic() + 0.02
+                 self.send(0xB0, bytes([self.enabled]))
+                 self.send(0xB1, struct.pack("<BBhBB", self.work_state, self.mode, 282, self.beep, 0x20))
+-                self.send(0xB2, struct.pack("<hhh", *self.current_motion()))
++                if self.motion_feedback:
++                    self.send(0xB2, struct.pack("<hhh", *self.current_motion()))
+                 self.send(0xB3, struct.pack("<ii", 0, 0))
+                 self.send(0xB7, struct.pack("<Bhi", channel, -10, -100))
+                 channel = (channel + 1) % 4
+@@ -166,7 +168,7 @@
+ 
+ 
+ class Rig:
+-    def __init__(self, interface, directory, auto_calibrate=False):
++    def __init__(self, interface, directory, auto_calibrate=False, use_imu=True):
+         self.interface = interface
+         self.emulator = Emulator(interface)
+         self.node = RosProbe("vehicle_integration_probe")
+@@ -198,6 +200,7 @@
+             "diagnostics:=test_diagnostics", "imu/data:=test_imu_data",
+             f"_can_interface:={interface}", "_publish_tf:=false", "_service_timeout:=0.6",
+             "_receive_only:=false", "_auto_initialize:=true",
++            f"_use_imu_heading:={str(use_imu).lower()}",
+             f"_auto_imu_calibration:={str(auto_calibrate is not False).lower()}",
+         ]
+         self.process = subprocess.Popen(arguments, stdout=self.log_file, stderr=subprocess.STDOUT)
+diff --git a/src/vehicle_driver/test/test_optional_imu.py b/src/vehicle_driver/test/test_optional_imu.py
+--- /dev/null
++++ b/src/vehicle_driver/test/test_optional_imu.py
+@@ -0,0 +1,138 @@
++"""Startup composition and actual no-IMU control on isolated vcan/TCPROS."""
++import os
++import subprocess
++
++import pytest
++import rosgraph
++import roslaunch
++import rospy
++import yaml
++from sensor_msgs.msg import Imu
++from std_msgs.msg import Bool
++from std_srvs.srv import Trigger
++from vehicle_interfaces.msg import MotionStatus
++from ros_test_support import init_ros
++from test_integration import Rig
++
++
++@pytest.fixture
++def chassis_rig(tmp_path):
++    interface = os.environ.get("VEHICLE_TEST_CAN")
++    if not interface:
++        pytest.skip("Set VEHICLE_TEST_CAN to an isolated vcan interface")
++    init_ros()
++    # Even a leftover automatic calibration setting must not block this mode.
++    rig = Rig(interface, tmp_path, auto_calibrate=True, use_imu=False)
++    try:
++        rig.wait(lambda: rig.states and rig.states[-1].enabled and
++                 rig.states[-1].mode == 2 and rig.headings)
++        yield rig
++    finally:
++        rig.close()
++
++
++def test_no_imu_completes_turn_heading_and_distance(chassis_rig):
++    rig = chassis_rig
++    rig.emulator.motion_response = True
++    for mode, target in ((1, -.2), (2, .1), (3, .08)):
++        result = rig.move(mode, target)
++        assert result.accepted, result.message
++        rig.wait(lambda: rig.motions and rig.motions[-1].goal_id == result.goal_id and
++                 not rig.motions[-1].active, timeout=8)
++        status = rig.motions[-1]
++        assert status.state == MotionStatus.SUCCEEDED, status.message
++        assert abs(status.remaining) <= (.01 if mode == 3 else .018)
++        assert not rig.headings[-1].imu_active and rig.headings[-1].imu_age == -1
++        rig.wait(lambda: rig.emulator.requested_motion == (0, 0, 0))
++
++
++def test_no_imu_ignores_external_sensor_and_runtime_parameter_edits(chassis_rig):
++    rig = chassis_rig
++    publisher = rig.node.create_publisher(Imu, "/test_imu_data", 1)
++    # A late subscriber sees the effective startup value, not ROS parameter edits.
++    modes = []
++    rig.node.create_subscription(Bool, "/test_vehicle/imu_enabled", modes.append, 1)
++    rig.wait(lambda: modes and rig.calibrations)
++    assert modes[-1].data is False
++    assert rig.calibrations[-1].state == 0
++    assert not rospy.ServiceProxy("/test_vehicle/calibrate_imu", Trigger)().success
++    rospy.set_param("/test_vehicle/use_imu_heading", True)
++    try:
++        message = Imu()
++        message.orientation.w = .70710678
++        message.orientation.z = .70710678
++        for _ in range(15):
++            message.header.stamp = rospy.Time.now()
++            publisher.publish(message)
++            rig.spin(.02)
++        assert publisher.get_subscription_count() == 0
++        subscriptions = rosgraph.Master(rospy.get_name()).getSystemState()[1]
++        assert not any(topic == "/test_imu_data" and "/test_vehicle" in nodes
++                       for topic, nodes in subscriptions)
++        assert not rig.headings[-1].imu_active
++        assert abs(rig.headings[-1].yaw) < .001
++        assert rospy.wait_for_message("/test_vehicle/imu_enabled", Bool, timeout=2).data is False
++        assert rig.move(1, .3, client_timeout=.2).accepted
++        rig.wait(lambda: rig.motions and rig.motions[-1].state == MotionStatus.FAILED)
++        assert "续期" in rig.motions[-1].message
++        rig.wait(lambda: rig.emulator.requested_motion == (0, 0, 0))
++    finally:
++        rospy.set_param("/test_vehicle/use_imu_heading", False)
++
++
++@pytest.mark.parametrize("loss", ["odometry", "disabled", "mode", "fault"])
++def test_no_imu_stops_on_feedback_or_chassis_failure(chassis_rig, loss):
++    rig = chassis_rig
++    rig.emulator.motion_response = True
++    result = rig.move(3, 1)
++    assert result.accepted, result.message
++    rig.wait(lambda: rig.emulator.requested_motion[0] > 0)
++    if loss == "odometry":
++        rig.emulator.motion_feedback = False
++    elif loss == "disabled":
++        rig.emulator.enabled = False
++    elif loss == "mode":
++        rig.emulator.mode = 1
++    else:
++        rig.emulator.work_state = 1
++    rig.wait(lambda: rig.motions[-1].goal_id == result.goal_id and
++             rig.motions[-1].state == MotionStatus.FAILED)
++    rig.wait(lambda: rig.emulator.requested_motion == (0, 0, 0))
++    assert not rig.move(3, .1).accepted
++    rig.emulator.motion_feedback = True
++    rig.emulator.enabled, rig.emulator.mode, rig.emulator.work_state = True, 2, 0
++    rig.spin(.4)
++    assert rig.motions[-1].state == MotionStatus.FAILED  # No automatic resume.
++    assert rig.emulator.requested_motion == (0, 0, 0)
++
++
++@pytest.mark.parametrize("package,launch", [
++    ("vehicle_driver", "vehicle.launch"), ("vehicle_gui", "console.launch")])
++@pytest.mark.parametrize("use_imu,start_imu", [(False, False), (False, True), (True, False), (True, True)])
++def test_launch_composes_one_consistent_heading_mode(package, launch, use_imu, start_imu):
++    args = [package, launch, "namespace:=mode_check",
++            "use_imu:=" + str(use_imu).lower(), "start_imu:=" + str(start_imu).lower()]
++    nodes = subprocess.check_output(["roslaunch", "--nodes"] + args, text=True).splitlines()
++    assert ("/mode_check/imu" in nodes) == (use_imu and start_imu)
++    params = yaml.safe_load(subprocess.check_output(["roslaunch", "--dump-params"] + args, text=True))
++    assert params["/mode_check/vehicle/use_imu_heading"] is use_imu
++    assert params["/mode_check/vehicle/receive_only"] is True
++    assert params["/mode_check/vehicle/auto_initialize"] is False
++
++
++@pytest.mark.parametrize("use_imu", [False, True])
++def test_gui_attachment_does_not_start_another_driver_or_imu(use_imu):
++    nodes = subprocess.check_output(["roslaunch", "--nodes", "vehicle_gui", "console.launch",
++        "namespace:=mode_check", "start_driver:=false", "use_imu:=" + str(use_imu).lower()], text=True).splitlines()
++    assert nodes == ["/mode_check/vehicle_gui"]
++
++
++@pytest.mark.parametrize("package,launch", [
++    ("vehicle_driver", "vehicle.launch"), ("vehicle_gui", "console.launch")])
++def test_invalid_mode_fails_before_starting_nodes(package, launch):
++    filename = roslaunch.rlutil.resolve_launch_arguments([package, launch])[0]
++    # Noetic's --dump-params reports parse errors but still exits with code 0.
++    # Use the same loader as real startup to verify rejection before any node runs.
++    with pytest.raises(roslaunch.RLException, match="bool"):
++        roslaunch.config.load_config_default(
++            [(filename, ["use_imu:=invalid", "start_imu:=false"])], None)
+diff --git a/src/vehicle_gui/launch/console.launch b/src/vehicle_gui/launch/console.launch
+--- a/src/vehicle_gui/launch/console.launch
++++ b/src/vehicle_gui/launch/console.launch
+@@ -5,26 +5,31 @@
+   <arg name="imu_can_interface" default="$(arg can_interface)"/>
+   <arg name="imu_protocol" default="classic"/>
+   <arg name="start_driver" default="true"/>
+-  <arg name="start_imu" default="$(arg start_driver)"/>
++  <arg name="use_imu" default="true" doc="Select IMU or chassis heading before enabling; restart to change"/>
++  <arg name="start_imu" default="$(eval arg('start_driver') and arg('use_imu'))"/>
++  <arg name="imu_auto_start" default="true"/>
+   <arg name="receive_only" default="true"/>
+   <arg name="auto_initialize" default="false"/>
+   <arg name="auto_imu_calibration" default="false"/>
+   <arg name="use_stamped_cmd_vel" default="true"/>
+   <arg name="quit_after" default="0"/>
++  <!-- One composition root owns driver parameters and sensor gating. -->
++  <include file="$(find vehicle_driver)/launch/vehicle.launch">
++    <arg name="config" value="$(arg config)"/>
++    <arg name="namespace" value="$(arg namespace)"/>
++    <arg name="can_interface" value="$(arg can_interface)"/>
++    <arg name="imu_can_interface" value="$(arg imu_can_interface)"/>
++    <arg name="imu_protocol" value="$(arg imu_protocol)"/>
++    <arg name="start_driver" value="$(arg start_driver)"/>
++    <arg name="start_imu" value="$(arg start_imu)"/>
++    <arg name="use_imu" value="$(arg use_imu)"/>
++    <arg name="imu_auto_start" value="$(arg imu_auto_start)"/>
++    <arg name="receive_only" value="$(arg receive_only)"/>
++    <arg name="auto_initialize" value="$(arg auto_initialize)"/>
++    <arg name="auto_imu_calibration" value="$(arg auto_imu_calibration)"/>
++    <arg name="use_stamped_cmd_vel" value="$(arg use_stamped_cmd_vel)"/>
++  </include>
+   <group ns="$(arg namespace)">
+-    <node pkg="vehicle_driver" type="vehicle_node" name="vehicle" output="screen" if="$(arg start_driver)">
+-      <rosparam command="load" file="$(arg config)"/>
+-      <param name="can_interface" value="$(arg can_interface)"/>
+-      <param name="receive_only" value="$(arg receive_only)"/>
+-      <param name="auto_initialize" value="$(arg auto_initialize)"/>
+-      <param name="auto_imu_calibration" value="$(arg auto_imu_calibration)"/>
+-      <param name="use_stamped_cmd_vel" value="$(arg use_stamped_cmd_vel)"/>
+-    </node>
+-    <node pkg="vehicle_driver" type="imu_node" name="imu" output="screen" if="$(arg start_imu)">
+-      <rosparam command="load" file="$(arg config)"/>
+-      <param name="imu_can_interface" value="$(arg imu_can_interface)"/>
+-      <param name="imu_protocol" value="$(arg imu_protocol)"/>
+-    </node>
+     <node pkg="vehicle_gui" type="vehicle_gui" name="vehicle_gui" output="screen" required="true"
+           args="--quit-after $(arg quit_after)">
+       <param name="use_stamped_cmd_vel" value="$(arg use_stamped_cmd_vel)"/>
+diff --git a/src/vehicle_gui/test/test_console.py b/src/vehicle_gui/test/test_console.py
+--- a/src/vehicle_gui/test/test_console.py
++++ b/src/vehicle_gui/test/test_console.py
+@@ -53,11 +53,13 @@
+     binary = Path(executable("vehicle_node"))
+     output = (tmp_path / "driver.log").open("w")
+     init_ros()
++    use_imu = getattr(request, "param", {}).get("use_imu", True)
+     driver = subprocess.Popen([
+         str(binary), "__name:=test_vehicle", "cmd_vel:=test_cmd_vel", "odom:=test_odom",
+         "diagnostics:=test_diagnostics", f"_can_interface:={interface}", "_publish_tf:=false",
+         "_service_timeout:=0.4", "_auto_imu_calibration:=false", "_auto_initialize:=true",
+         "_receive_only:=false",
++        f"_use_imu_heading:={str(use_imu).lower()}",
+     ], stdout=output, stderr=subprocess.STDOUT)
+     rospy.set_param("/test_gui/driver_name", "test_vehicle")
+     gui_args = ["__name:=test_gui", "cmd_vel:=test_cmd_vel", "odom:=test_odom",
+@@ -103,6 +105,38 @@
+ 
+ def motion_commands(emulator):
+     return [(stamp, struct.unpack("<hhh", data)) for stamp, code, data in emulator.commands if code == 0x12]
++
++
++@pytest.mark.parametrize("console", [{"use_imu": False}], indirect=True)
++def test_no_imu_console_uses_chassis_heading_and_disables_imu_actions(console):
++    window, model, emulator, _ = console
++    wait_for(lambda: model.store.latest("imu_mode") is not None)
++    window.refresh()
++    assert "无 IMU" in window.imu_mode_label.text()
++    assert "底盘反馈" in window.heading_hold.text()
++    assert not window.calibration_button.isEnabled()
++    assert not window.zero_imu_button.isEnabled()
++    assert window._heading_feedback()[0] is not None
++    emulator.motion_response = True
++    window.turn_angle.setValue(10)
++    QTest.mouseClick(window.turn_button, Qt.LeftButton)
++    wait_for(lambda: model.last_result and model.last_result.get("request_accepted"))
++    wait_for(lambda: model.store.latest("motion_status").value["state"] == 2, timeout=8)
++    wait_for(lambda: window._motion_revision is None)
++    window.drive_distance.setValue(.06)
++    QTest.mouseClick(window.distance_button, Qt.LeftButton)
++    wait_for(lambda: motion_commands(emulator)[-1][1][0] > 0)
++    wait_for(lambda: model.store.latest("motion_status").value["state"] == 2, timeout=8)
++    wait_for(lambda: window._motion_revision is None)
++    window.setFocus()
++    QTest.keyPress(window, Qt.Key_W)
++    wait_for(lambda: window.steering.mode == "直行保向")
++    QTest.keyRelease(window, Qt.Key_W)
++    wait_for(lambda: motion_commands(emulator)[-1][1] == (0, 0, 0))
++    emulator.motion_feedback = False
++    QTest.qWait(350)
++    assert window._heading_feedback()[0] is None
++    assert not model.store.latest("heading").value["imu_active"]
+ 
+ 
+ def test_mouse_controls_reach_can_and_release_stops(console):
+diff --git a/src/vehicle_gui/vehicle_gui/ros_worker.py b/src/vehicle_gui/vehicle_gui/ros_worker.py
+--- a/src/vehicle_gui/vehicle_gui/ros_worker.py
++++ b/src/vehicle_gui/vehicle_gui/ros_worker.py
+@@ -14,7 +14,7 @@
+ from sensor_msgs.msg import Imu
+ from diagnostic_msgs.msg import DiagnosticArray
+ from std_srvs.srv import Trigger, TriggerRequest
+-from std_msgs.msg import UInt64
++from std_msgs.msg import Bool, UInt64
+ from vehicle_interfaces.msg import (Acknowledgement, CanFrame, DriverMotion, DriverStatus,
+     Faults, Heading, ImuCalibration, ImuStatus, MotionStatus, State, Version, WheelMileage)
+ from vehicle_interfaces.srv import Command, CommandRequest, ExecuteMotion, ExecuteMotionRequest
+@@ -72,6 +72,8 @@
+         self.subscribe(DriverStatus, self.topic("driver_status"), self.on_driver_status, 5)
+         self.subscribe(Odometry, "odom", self.on_odom)
+         self.subscribe(Heading, self.topic("heading"), self.on_heading)
++        self.subscribe(Bool, self.topic("imu_enabled"),
++            lambda m: store.update("imu_mode", {"enabled": m.data}), 1)
+         self.subscribe(ImuCalibration, self.topic("imu_calibration"), self.on_calibration, 1)
+         self.subscribe(MotionStatus, self.topic("motion_status"), self.on_motion_status, 1)
+         self.subscribe(Imu, "imu/data", self.on_imu)
+diff --git a/src/vehicle_gui/vehicle_gui/steering.py b/src/vehicle_gui/vehicle_gui/steering.py
+--- a/src/vehicle_gui/vehicle_gui/steering.py
++++ b/src/vehicle_gui/vehicle_gui/steering.py
+@@ -71,7 +71,7 @@
+             return 0.0, 0.0
+         if yaw is None:
+             self.cancel()
+-            self.mode = "IMU 航向过期，定角转向已结束"
++            self.mode = "航向反馈过期，定角转向已结束"
+             return 0.0, 0.0
+         current = self.observe(yaw)
+         wz = self._correction(current, max_rate)
+diff --git a/src/vehicle_gui/vehicle_gui/window.py b/src/vehicle_gui/vehicle_gui/window.py
+--- a/src/vehicle_gui/vehicle_gui/window.py
++++ b/src/vehicle_gui/vehicle_gui/window.py
+@@ -221,7 +221,7 @@
+         self.stop_button = self._button("停止运动  /  空格", self.stop_controls, "stop", False)
+         self.stop_button.setMinimumHeight(42)
+         layout.addWidget(self.stop_button)
+-        self.heading_hold = QCheckBox("直行时用 IMU 保持航向")
++        self.heading_hold = QCheckBox("直行时保持航向")
+         self.heading_hold.setChecked(True)
+         layout.addWidget(self.heading_hold)
+         self.calibration_label = label("IMU 方向标定 · 等待驱动")
+@@ -250,7 +250,7 @@
+         layout.addLayout(angle_row)
+         self.turn_button = self._button("执行角度转向", self._start_turn)
+         layout.addWidget(self.turn_button)
+-        layout.addWidget(label("定距离前进 · IMU 保向", "section"))
++        layout.addWidget(label("定距离前进 · 航向保持", "section"))
+         distance_row = QHBoxLayout()
+         self.drive_distance = QDoubleSpinBox()
+         self.drive_distance.setRange(0.01, 100)
+@@ -309,6 +309,10 @@
+         layout.addWidget(self.steering_label)
+         layout.addSpacing(4)
+         layout.addWidget(label("设备操作", "section"))
++        self.imu_mode_label = label("运行模式 · 等待驱动")
++        self.imu_mode_label.setWordWrap(True)
++        self.imu_mode_label.setToolTip("使能前通过 use_imu 启动参数选择；切换模式需停止并重启驱动")
++        layout.addWidget(self.imu_mode_label)
+         enable_row = QHBoxLayout()
+         self.enable_button = self._button("使能", lambda: self._command(3, enabled=True), "primary")
+         self.disable_button = self._button("失能", lambda: self._command(3, enabled=False))
+@@ -394,7 +398,7 @@
+         self.record_label = label("路径记录包含航向、控制目标与 IMU 状态")
+         recording.addWidget(self.record_label, 1)
+         layout.addLayout(recording)
+-        self.imu_label = label("IMU · 等待 can1 姿态反馈")
++        self.imu_label = label("IMU · 等待驱动模式与姿态反馈")
+         self.imu_label.setWordWrap(True)
+         layout.addWidget(self.imu_label)
+         self.pose_label = label("X —    Y —    航向 —    ·    等待里程计反馈")
+@@ -496,11 +500,18 @@
+             self.steering.cancel()
+             self.model.lease.stop()
+ 
++    def _imu_enabled(self):
++        sample = self.model.store.latest("imu_mode")
++        return sample.value["enabled"] if sample else None
++
+     def _heading_feedback(self):
+         sample = self.model.store.latest("heading")
+-        if sample and sample.fresh(0.25) and sample.value["imu_active"] and \
+-                0 <= sample.value["imu_age"] + sample.age() < 0.25:
+-            return sample.value["yaw"], sample.value["wz"]
++        if sample and sample.fresh(0.25):
++            chassis_mode = self._imu_enabled() is False
++            imu_ready = sample.value["imu_active"] and \
++                0 <= sample.value["imu_age"] + sample.age() < 0.25
++            if chassis_mode or imu_ready:
++                return sample.value["yaw"], sample.value["wz"]
+         return None, 0.0
+ 
+     def _steering_state(self):
+@@ -539,7 +550,8 @@
+     def _start_motion(self, mode, target):
+         yaw, _ = self._heading_feedback()
+         if yaw is None:
+-            self.model.store.event("暂无有效 IMU 航向，无法执行自动运动；方向键仍可使用", "warning")
++            source = "底盘" if self._imu_enabled() is False else "IMU"
++            self.model.store.event(f"暂无有效{source}航向，无法执行自动运动；方向键仍可使用", "warning")
+             return
+         if self.angular.value() <= 0:
+             self.model.store.event("请将旋转速度设为大于 0", "warning")
+@@ -726,21 +738,31 @@
+                     imu and imu.fresh(0.25, now) and imu.value.get("valid"))
+ 
+     def _update_imu_buttons(self):
++        imu_enabled = self._imu_enabled() is True
+         sample = self.model.store.latest("imu_calibration")
+         state = sample.value["state"] if sample else 0
+         running = sample is not None and sample.fresh(0.5) and 1 <= state <= 6
+-        self.calibration_button.setEnabled(not self.model.busy and not running)
++        self.calibration_button.setEnabled(imu_enabled and not self.model.busy and not running)
+         self.calibration_button.setText(("标定等待中…" if state == 1 else "标定进行中…") if running else
+                                          ("重新标定 IMU" if state >= 7 else "开始 IMU 标定"))
+-        self.zero_imu_button.setEnabled(not self.model.busy and self._imu_orientation_available(
++        self.zero_imu_button.setEnabled(imu_enabled and not self.model.busy and self._imu_orientation_available(
+             self.model.store.latest("imu_status"), self.model.store.latest("imu")))
+ 
+     def refresh(self):
+         now = time.monotonic()
+         latest, history, frames, events, revision = self.model.store.snapshot()
+         self._update_imu_buttons()
++        imu_enabled = self._imu_enabled()
++        if imu_enabled is not None:
++            self.imu_mode_label.setText("有 IMU 模式 · IMU 航向" if imu_enabled else
++                                       "无 IMU 模式 · 底盘反馈航向")
++            self.heading_hold.setText("直行时用 IMU 保持航向" if imu_enabled else
++                                      "直行时用底盘反馈保持航向")
+         calibration = latest.get("imu_calibration")
+-        if calibration:
++        if imu_enabled is False:
++            self.calibration_label.setText("无 IMU 模式 · 标定与 IMU 置零不可用")
++            self.calibration_label.setToolTip("定角、定距和保向使用底盘反馈积分；轮滑会产生航向误差")
++        elif calibration:
+             c = calibration.value
+             phases = {0: "自动标定关闭", 1: "等待底盘与 IMU", 2: "标定准备中", 3: "正转测量",
+                       4: "停转等待", 5: "反转回位测量", 6: "检查双向结果", 7: "方向标定完成",
+@@ -755,7 +777,10 @@
+                 f"\n正转 yaw 变化 {math.degrees(c['positive_delta']):+.2f}°，反转 {math.degrees(c['negative_delta']):+.2f}°")
+         imu_status = latest.get("imu_status")
+         imu = latest.get("imu")
+-        if imu_status:
++        if imu_enabled is False:
++            self.imu_label.setText("IMU 已禁用 · 使用底盘里程计航向")
++            self.imu_label.setToolTip("启动时选择无 IMU 模式；外部 IMU 数据不参与控制")
++        elif imu_status:
+             s = imu_status.value
+             valid = self._imu_orientation_available(imu_status, imu, now)
+             angles = ("   横滚 {:+.1f}°   俯仰 {:+.1f}°   IMU 相对航向 {:+.1f}°".format(
+diff --git a/tools/hardware_smoke.py b/tools/hardware_smoke.py
+--- a/tools/hardware_smoke.py
++++ b/tools/hardware_smoke.py
+@@ -38,11 +38,14 @@
+     parser = argparse.ArgumentParser(description=__doc__)
+     parser.add_argument("--can-interface", default="can0")
+     parser.add_argument("--imu-interface", help="Defaults to --can-interface for the shared bus")
++    parser.add_argument("--use-imu", choices=("true", "false"), default="true",
++                        help="Select the same startup mode as use_imu in roslaunch")
+     parser.add_argument("--seconds", type=float, default=5)
+     parser.add_argument("--port", type=int, default=11330)
+     parser.add_argument("--output", type=Path, required=True)
+     parser.add_argument("--screenshot", type=Path)
+     args = parser.parse_args()
++    use_imu = args.use_imu == "true"
+     args.imu_interface = args.imu_interface or args.can_interface
+     with socket.socket() as probe:
+         if probe.connect_ex(("127.0.0.1", args.port)) == 0:
+@@ -52,21 +55,24 @@
+     os.environ.pop("ROS_HOSTNAME", None)
+     # Import after selecting the isolated master.
+     import rosgraph
++    import rosnode
+     import rospy
+     from sensor_msgs.msg import Imu
+     from diagnostic_msgs.msg import DiagnosticArray
+     from std_srvs.srv import Trigger
+-    from vehicle_interfaces.msg import ImuStatus, State
++    from std_msgs.msg import Bool
++    from vehicle_interfaces.msg import Heading, ImuStatus, State
+ 
+     args.output.parent.mkdir(parents=True, exist_ok=True)
+     before = counters(args.can_interface)
+     report = {"utc": datetime.now(timezone.utc).isoformat(), "host": socket.gethostname(),
+               "architecture": os.uname().machine, "ros_distro": os.environ.get("ROS_DISTRO"),
+               "can_interface": args.can_interface, "imu_interface": args.imu_interface,
+-              "can_before": before, "receive_only": True}
++              "can_before": before, "receive_only": True, "use_imu": use_imu}
+     processes, subscriptions = [], []
+     gui = None
+     states, statuses, data, diagnostics = [], [], [], []
++    modes, headings = [], []
+     # Network TX counters include IMU NMT on a shared bus. Observe local chassis
+     # extended command frames separately, including shutdown, without sending.
+     observed_chassis_tx = []
+@@ -101,6 +107,8 @@
+             rospy.init_node("noetic_hardware_observer", disable_signals=True)
+             subscriptions = [
+                 rospy.Subscriber("/noetic_check/vehicle/state", State, states.append, queue_size=10),
++                rospy.Subscriber("/noetic_check/vehicle/imu_enabled", Bool, modes.append, queue_size=1),
++                rospy.Subscriber("/noetic_check/vehicle/heading", Heading, headings.append, queue_size=10),
+                 rospy.Subscriber("/noetic_check/imu/status", ImuStatus, statuses.append, queue_size=10),
+                 rospy.Subscriber("/noetic_check/imu/data", Imu,
+                     lambda m: data.append((time.monotonic(), m)), queue_size=100),
+@@ -111,8 +119,11 @@
+                 "roslaunch", "vehicle_driver", "vehicle.launch", "namespace:=noetic_check",
+                 "receive_only:=true", "auto_initialize:=false", "auto_imu_calibration:=false",
+                 "can_interface:=" + args.can_interface, "imu_can_interface:=" + args.imu_interface,
++                "use_imu:=" + args.use_imu,
+             ], stdout=log, stderr=subprocess.STDOUT))
+-            rospy.wait_for_service("/noetic_check/imu/zero_orientation", timeout=10)
++            rospy.wait_for_service("/noetic_check/vehicle/command", timeout=10)
++            if use_imu:
++                rospy.wait_for_service("/noetic_check/imu/zero_orientation", timeout=10)
+             if args.screenshot:
+                 gui_env = dict(os.environ, QT_QPA_PLATFORM="offscreen", PYQTGRAPH_QT_LIB="PyQt5")
+                 gui = subprocess.Popen([
+@@ -126,6 +137,11 @@
+             report["receive_only_parameter"] = rospy.get_param("/noetic_check/vehicle/receive_only")
+             report["vehicle_state_messages"] = len(states)
+             report["vehicle_online"] = bool(states and states[-1].online)
++            report["vehicle_enabled"] = bool(states and states[-1].enabled)
++            report["effective_imu_enabled"] = modes[-1].data if modes else None
++            report["imu_node_running"] = "/noetic_check/imu" in rosnode.get_node_names()
++            report["heading_samples"] = len(headings)
++            report["heading_imu_active"] = bool(headings and headings[-1].imu_active)
+             report["imu_status_messages"] = len(statuses)
+             report["imu_online"] = bool(statuses and statuses[-1].online)
+             report["imu_measurement_valid"] = bool(statuses and statuses[-1].measurement_valid)
+@@ -142,9 +158,10 @@
+                 report["quaternion_norm"] = math.sqrt(sum(getattr(m.orientation, a)**2 for a in "xyzw"))
+                 report["acceleration_m_s2"] = [getattr(m.linear_acceleration, a) for a in "xyz"]
+                 report["angular_velocity_rad_s"] = [getattr(m.angular_velocity, a) for a in "xyz"]
+-            zero = rospy.ServiceProxy("/noetic_check/imu/zero_orientation", Trigger)()
+-            report["imu_zero_success"] = zero.success
+-            report["imu_zero_message"] = zero.message
++            if use_imu:
++                zero = rospy.ServiceProxy("/noetic_check/imu/zero_orientation", Trigger)()
++                report["imu_zero_success"] = zero.success
++                report["imu_zero_message"] = zero.message
+             if diagnostics:
+                 report["driver_diagnostics"] = {item.key: item.value for item in diagnostics[-1].status[0].values}
+             report["nodes_running"] = all(p.poll() is None for p in processes)
+@@ -171,6 +188,9 @@
+     print(json.dumps(report, indent=2, ensure_ascii=False))
+     if not report.get("nodes_running") or not report["chassis_tx_zero"]:
+         return 1
++    if not use_imu:
++        return 0 if report.get("vehicle_online") and report["effective_imu_enabled"] is False and \
++                    not report["imu_node_running"] and not report["heading_imu_active"] else 2
+     return 0 if report.get("vehicle_online") and report.get("imu_measurement_valid") and \
+                 report.get("imu_orientation_valid") else 2
+ 

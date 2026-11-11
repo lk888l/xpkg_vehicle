@@ -1,0 +1,142 @@
+[
+  {
+    "bitrate": 500000,
+    "addressed_imu_start_only": true,
+    "stopped_on_first_error": true,
+    "frames": [
+      "88000020080000000000001b00000000"
+    ],
+    "tx_delta": 0,
+    "controller": {
+      "ctrlmode": [
+        "BERR-REPORTING"
+      ],
+      "state": "ERROR-ACTIVE",
+      "berr_counter": {
+        "tx": 128,
+        "rx": 0
+      },
+      "restart_ms": 0,
+      "bittiming": {
+        "bitrate": 500000,
+        "sample_point": 0.8,
+        "tq": 20,
+        "prop_seg": 39,
+        "phase_seg1": 40,
+        "phase_seg2": 20,
+        "sjw": 1
+      },
+      "bittiming_const": {
+        "name": "mttcan",
+        "tseg1": {
+          "min": 2,
+          "max": 255
+        },
+        "tseg2": {
+          "min": 0,
+          "max": 127
+        },
+        "sjw": {
+          "min": 1,
+          "max": 127
+        },
+        "brp": {
+          "min": 1,
+          "max": 511
+        },
+        "brp_inc": 1
+      },
+      "data_bittiming_const": {
+        "name": "mttcan",
+        "tseg1": {
+          "min": 1,
+          "max": 31
+        },
+        "tseg2": {
+          "min": 0,
+          "max": 15
+        },
+        "sjw": {
+          "min": 1,
+          "max": 15
+        },
+        "brp": {
+          "min": 1,
+          "max": 15
+        },
+        "brp_inc": 1
+      },
+      "clock": 50000000
+    }
+  },
+  {
+    "bitrate": 1000000,
+    "addressed_imu_start_only": true,
+    "stopped_on_first_error": true,
+    "frames": [
+      "88000020080000000000001b00000000"
+    ],
+    "tx_delta": 0,
+    "controller": {
+      "ctrlmode": [
+        "BERR-REPORTING"
+      ],
+      "state": "ERROR-PASSIVE",
+      "berr_counter": {
+        "tx": 128,
+        "rx": 0
+      },
+      "restart_ms": 0,
+      "bittiming": {
+        "bitrate": 1000000,
+        "sample_point": 0.8,
+        "tq": 20,
+        "prop_seg": 19,
+        "phase_seg1": 20,
+        "phase_seg2": 10,
+        "sjw": 1
+      },
+      "bittiming_const": {
+        "name": "mttcan",
+        "tseg1": {
+          "min": 2,
+          "max": 255
+        },
+        "tseg2": {
+          "min": 0,
+          "max": 127
+        },
+        "sjw": {
+          "min": 1,
+          "max": 127
+        },
+        "brp": {
+          "min": 1,
+          "max": 511
+        },
+        "brp_inc": 1
+      },
+      "data_bittiming_const": {
+        "name": "mttcan",
+        "tseg1": {
+          "min": 1,
+          "max": 31
+        },
+        "tseg2": {
+          "min": 0,
+          "max": 15
+        },
+        "sjw": {
+          "min": 1,
+          "max": 15
+        },
+        "brp": {
+          "min": 1,
+          "max": 15
+        },
+        "brp_inc": 1
+      },
+      "clock": 50000000
+    }
+  }
+]

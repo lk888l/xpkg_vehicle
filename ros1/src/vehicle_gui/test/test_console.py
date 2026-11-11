@@ -53,11 +53,12 @@ def console(app, tmp_path, request):
     binary = Path(executable("vehicle_node"))
     output = (tmp_path / "driver.log").open("w")
     init_ros()
+    use_imu = getattr(request, "param", {}).get("use_imu", True)
     driver = subprocess.Popen([
         str(binary), "__name:=test_vehicle", "cmd_vel:=test_cmd_vel", "odom:=test_odom",
         "diagnostics:=test_diagnostics", f"_can_interface:={interface}", "_publish_tf:=false",
         "_service_timeout:=0.4", "_auto_imu_calibration:=false", "_auto_initialize:=true",
-        "_receive_only:=false",
+        f"_use_imu_heading:={str(use_imu).lower()}",
     ], stdout=output, stderr=subprocess.STDOUT)
     rospy.set_param("/test_gui/driver_name", "test_vehicle")
     gui_args = ["__name:=test_gui", "cmd_vel:=test_cmd_vel", "odom:=test_odom",
@@ -103,6 +104,38 @@ def console(app, tmp_path, request):
 
 def motion_commands(emulator):
     return [(stamp, struct.unpack("<hhh", data)) for stamp, code, data in emulator.commands if code == 0x12]
+
+
+@pytest.mark.parametrize("console", [{"use_imu": False}], indirect=True)
+def test_no_imu_console_uses_chassis_heading_and_disables_imu_actions(console):
+    window, model, emulator, _ = console
+    wait_for(lambda: model.store.latest("imu_mode") is not None)
+    window.refresh()
+    assert "无 IMU" in window.imu_mode_label.text()
+    assert "底盘反馈" in window.heading_hold.text()
+    assert not window.calibration_button.isEnabled()
+    assert not window.zero_imu_button.isEnabled()
+    assert window._heading_feedback()[0] is not None
+    emulator.motion_response = True
+    window.turn_angle.setValue(10)
+    QTest.mouseClick(window.turn_button, Qt.LeftButton)
+    wait_for(lambda: model.last_result and model.last_result.get("request_accepted"))
+    wait_for(lambda: model.store.latest("motion_status").value["state"] == 2, timeout=8)
+    wait_for(lambda: window._motion_revision is None)
+    window.drive_distance.setValue(.06)
+    QTest.mouseClick(window.distance_button, Qt.LeftButton)
+    wait_for(lambda: motion_commands(emulator)[-1][1][0] > 0)
+    wait_for(lambda: model.store.latest("motion_status").value["state"] == 2, timeout=8)
+    wait_for(lambda: window._motion_revision is None)
+    window.setFocus()
+    QTest.keyPress(window, Qt.Key_W)
+    wait_for(lambda: window.steering.mode == "直行保向")
+    QTest.keyRelease(window, Qt.Key_W)
+    wait_for(lambda: motion_commands(emulator)[-1][1] == (0, 0, 0))
+    emulator.motion_feedback = False
+    QTest.qWait(350)
+    assert window._heading_feedback()[0] is None
+    assert not model.store.latest("heading").value["imu_active"]
 
 
 def test_mouse_controls_reach_can_and_release_stops(console):

@@ -46,6 +46,7 @@ class Emulator:
         self.work_state = 0
         self.commands = []
         self.motion_response = False
+        self.motion_feedback = True
         self.requested_motion = (0, 0, 0)
         self.motion_time = 0.0
         self.running = True
@@ -94,7 +95,8 @@ class Emulator:
                 deadline = time.monotonic() + 0.02
                 self.send(0xB0, bytes([self.enabled]))
                 self.send(0xB1, struct.pack("<BBhBB", self.work_state, self.mode, 282, self.beep, 0x20))
-                self.send(0xB2, struct.pack("<hhh", *self.current_motion()))
+                if self.motion_feedback:
+                    self.send(0xB2, struct.pack("<hhh", *self.current_motion()))
                 self.send(0xB3, struct.pack("<ii", 0, 0))
                 self.send(0xB7, struct.pack("<Bhi", channel, -10, -100))
                 channel = (channel + 1) % 4
@@ -166,7 +168,7 @@ class ImuEmulator:
 
 
 class Rig:
-    def __init__(self, interface, directory, auto_calibrate=False):
+    def __init__(self, interface, directory, auto_calibrate=False, use_imu=True):
         self.interface = interface
         self.emulator = Emulator(interface)
         self.node = RosProbe("vehicle_integration_probe")
@@ -197,7 +199,8 @@ class Rig:
             str(binary), "__name:=test_vehicle", "cmd_vel:=test_cmd_vel", "odom:=test_odom",
             "diagnostics:=test_diagnostics", "imu/data:=test_imu_data",
             f"_can_interface:={interface}", "_publish_tf:=false", "_service_timeout:=0.6",
-            "_receive_only:=false", "_auto_initialize:=true",
+            "_auto_initialize:=true",
+            f"_use_imu_heading:={str(use_imu).lower()}",
             f"_auto_imu_calibration:={str(auto_calibrate is not False).lower()}",
         ]
         self.process = subprocess.Popen(arguments, stdout=self.log_file, stderr=subprocess.STDOUT)
